@@ -1,0 +1,15 @@
+Information about the program:
+    This program is a simple shell simulating the SIC(Simplified Instruction Computer).
+    The program consists of the files: 
+    	20162004.c, shellCommands.c, memoryCommands.c, opcodeCommands.c, generalFunctions.c and 20162004.h
+    In the header file the necessary libraries are included and the constants and data structures are defined.
+    The global variables for the Virtual Memory and the Hashtable is defined in 20162004.c
+    The program also need a makefile for the compilation of the program.
+
+How to compile:
+    The program is compiled using the gnu compiler (GCC).
+    To compile you can simply write "make" when being in the project directory.
+
+How to use the program:
+    After compiling the program you start it by typing "./20162004.out" in the commandline while being in the project directory.
+    To see a list of available commands you can type "help" or "h" in the shell.
