@@ -51,6 +51,7 @@ void freeHashtable(void);
 void freeArguments(char**);
 int readline(char*, FILE*);
 struct historyNode* getSetHistHead(void);
+int findFile(char*);
 
 // Functions regarding memory
 int memDump(char**, int);

@@ -251,3 +251,18 @@ struct historyNode* getSetHistHead(void){
     }
     return head;
 }
+
+int findFile(char* string){
+    DIR *dirp;
+    struct dirent *dir;
+    int found = 0;
+
+    dirp = opendir(".");
+    while(!found && (dir = readdir(dirp)) != NULL){
+        if(!(strcmp(dir->d_name, string))){
+            found = 1;
+        }
+    }
+    closedir(dirp);
+    return found;
+}

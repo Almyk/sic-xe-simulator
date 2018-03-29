@@ -85,32 +85,24 @@ int funcHistory(char *command){
 }
 
 int funcType(char** args){
-    DIR *dirp;
-    struct dirent *dir;
     FILE *fp;
     char buffer[MAXBUF] = "";
     int found = 0;
 
-    dirp = opendir(".");
-
-    while(!found && (dir = readdir(dirp)) != NULL){
-        if(!(strcmp(dir->d_name, args[1]))){
-            found = 1;
-        }
-    }
-    if(found){
+    found = findFile(args[1]);
+    if(found == 1){
         printf("\n");
         fp = fopen(args[1], "r");
         while(readline(buffer, fp)){
             printf("\t%s\n", buffer);
         }
         printf("\n");
+        fclose(fp);
     }
     else{
         printf("Error: File not found.\n");
-        return -2;
+        found = -2;
     }
 
-    closedir(dirp);
-    return 1;
+    return found;
 }
