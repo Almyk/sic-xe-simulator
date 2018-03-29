@@ -16,7 +16,8 @@ void getInput(char* command){
 }
 
 char** parseInput(char* command, int* n){
-    /* this function tokenizes the input and does some initial validation on the input */
+    /* this function tokenizes the input,
+     * and does some initial validation on the input */
     char** arguments = (char**) malloc(sizeof(char*) * TOKENBUF+1);
     char* token;
     char* tmpString = (char*) calloc(MAXBUF, sizeof(char));
