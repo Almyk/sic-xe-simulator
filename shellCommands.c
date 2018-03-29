@@ -20,6 +20,9 @@ int funcHelp(void){
     printf("reset\n");
     printf("opcode mnemonic\n");
     printf("opcodelist\n");
+    printf("assemble filename\n");
+    printf("type filename\n");
+    printf("symbol\n");
     return 1;
 }
 
