@@ -71,6 +71,9 @@ int funcHelp(void);
 int funcDir(void);
 int funcQuit(void);
 int funcHistory(char*);
-int funcType(char**);
+int funcType(char*);
+
+// assembler functions
+int asmAssemble(char*);
 
 #endif

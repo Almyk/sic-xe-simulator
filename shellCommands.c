@@ -84,15 +84,21 @@ int funcHistory(char *command){
     return 2;
 }
 
-int funcType(char** args){
+int funcType(char* filename){
+    /* accepts a string as a parameter
+     * utilizes findFile() to search for file
+     * if found it reads the file line by line
+     * and prints it. Else is prints an error msg.
+     */
+
     FILE *fp;
     char buffer[MAXBUF] = "";
     int found = 0;
 
-    found = findFile(args[1]);
+    found = findFile(filename);
     if(found == 1){
         printf("\n");
-        fp = fopen(args[1], "r");
+        fp = fopen(filename, "r");
         while(readline(buffer, fp)){
             printf("\t%s\n", buffer);
         }

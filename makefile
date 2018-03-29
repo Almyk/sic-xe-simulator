@@ -1,7 +1,7 @@
 CC = gcc
 CFLAGS = -Wall
 DEPS = 20162004.h
-OBJ = 20162004.o shellCommands.o memoryCommands.o opcodeCommands.o generalFunctions.o
+OBJ = 20162004.o shellCommands.o memoryCommands.o opcodeCommands.o generalFunctions.o asmCommands.o
 FILENAME = 20162004.out
 
 %.o: %.c $(DEPS)

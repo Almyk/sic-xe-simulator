@@ -252,14 +252,19 @@ struct historyNode* getSetHistHead(void){
     return head;
 }
 
-int findFile(char* string){
+int findFile(char* filename){
+    /* searches for file in current directory
+     * uses the dirent.h library functions.
+     * returns 1 if found, 0 if not found.
+     */
+
     DIR *dirp;
     struct dirent *dir;
     int found = 0;
 
     dirp = opendir(".");
     while(!found && (dir = readdir(dirp)) != NULL){
-        if(!(strcmp(dir->d_name, string))){
+        if(!(strcmp(dir->d_name, filename))){
             found = 1;
         }
     }
