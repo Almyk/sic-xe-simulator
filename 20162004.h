@@ -52,6 +52,8 @@ void freeArguments(char**);
 int readline(char*, FILE*);
 struct historyNode* getSetHistHead(void);
 int findFile(char*);
+int cmpExtension(const char*, const char*);
+
 
 // Functions regarding memory
 int memDump(char**, int);

@@ -4,6 +4,16 @@ int asmAssemble(char* filename){
     int status = 0;
 
     status = findFile(filename);
-    printf("testing\n");
+    // file found
+    if(status){
+        status = cmpExtension(filename, ".asm");
+        if(!status){
+        }
+        // incorrect extension
+        else status = -8;
+    }
+    // not found
+    else status = -7;
+
     return status;
 }

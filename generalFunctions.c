@@ -162,13 +162,15 @@ int power(int base, int exp){
 
 void printError(int n){
     switch(n){
-        case -1: printf("Error: Not a valid command, please try 'help'.\n"); break;
-        case -3: printf("Error: End address < Start address.\n"); break;
-        case -4: printf("Error: Not a valid hexadecimal.\n"); break;
-        case -5: printf("Error: Hexadecimals have to be in the range [0x00000, 0xFFFFF].\n");
-                 printf("Please make sure your hexadecimals are no longer than 5 signs.\n");
-                 break;
-        case -6: printf("Error: Value to be stored exceeds the range [0x0,0xFF].\n"); break;
+    case -1: printf("Error: Not a valid command, please try 'help'.\n"); break;
+    case -3: printf("Error: End address < Start address.\n"); break;
+    case -4: printf("Error: Not a valid hexadecimal.\n"); break;
+    case -5: printf("Error: Hexadecimals have to be in the range [0x00000, 0xFFFFF].\n");
+        printf("Please make sure your hexadecimals are no longer than 5 signs.\n");
+        break;
+    case -6: printf("Error: Value to be stored exceeds the range [0x0,0xFF].\n"); break;
+    case -7: printf("Error: file not found.\n"); break;
+    case -8: printf("Error: file is not a '.asm' file.\n"); break;
     }
 }
 void freeHistory(void){
@@ -270,4 +272,11 @@ int findFile(char* filename){
     }
     closedir(dirp);
     return found;
+}
+
+int cmpExtension(const char* filename, const char* extension){
+    int filenameLen = strlen(filename);
+    int extLen = strlen(extension);
+
+    return strcmp(filename+filenameLen-extLen, extension);
 }

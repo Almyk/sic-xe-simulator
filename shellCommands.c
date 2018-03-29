@@ -93,10 +93,10 @@ int funcType(char* filename){
 
     FILE *fp;
     char buffer[MAXBUF] = "";
-    int found = 0;
+    int status = 0;
 
-    found = findFile(filename);
-    if(found == 1){
+    status = findFile(filename);
+    if(status == 1){
         printf("\n");
         fp = fopen(filename, "r");
         while(readline(buffer, fp)){
@@ -106,9 +106,8 @@ int funcType(char* filename){
         fclose(fp);
     }
     else{
-        printf("Error: File not found.\n");
-        found = -2;
+        status = -7;
     }
 
-    return found;
+    return status;
 }
