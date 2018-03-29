@@ -52,7 +52,7 @@ void freeArguments(char**);
 int readline(char*, FILE*);
 struct historyNode* getSetHistHead(void);
 
-// 메모리 명령어 함수들
+// Functions regarding memory
 int memDump(char**, int);
 int memEdit(char**, int);
 int memFill(char**, int);
@@ -65,10 +65,11 @@ struct opcodeNode* opSearch(char*, int);
 int opPrintOpcodelist(void);
 int hashcode(char*);
 
-// 셸 명령어 함수들
+// general shell command function
 int funcHelp(void);
 int funcDir(void);
 int funcQuit(void);
 int funcHistory(char*);
+int funcType(char**);
 
 #endif

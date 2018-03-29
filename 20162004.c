@@ -45,6 +45,9 @@ int runCommand(char **args, int n){
         else if(n == 2 && !(strcmp(args[0], "opcode"))){
             status = opMnem(args);
         }
+        else if(n == 2 && !(strcmp(args[0], "type"))){
+            status = funcType(args);
+        }
         // commands that should only take 1 argument
         else if(args[1] == NULL){
             if(!(strcmp(args[0], "help")) || !(strcmp(args[0], "h"))) 
