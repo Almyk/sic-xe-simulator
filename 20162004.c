@@ -2,7 +2,8 @@
 
 // global variables
 unsigned char MEMORY[MEGA] = "";
-struct opcodeNode* HASHTABLE[HASHSIZE];
+struct opcodeNode* HASHTABLE[HASHSIZE]; // Operation Code Table
+struct symbolNode* SYMTAB[SYMHASHSIZE]; // Symbol Table
 
 int main(void){
     char command[MAXBUF] = ""; // input buffer
@@ -25,6 +26,7 @@ int main(void){
     }while(status);
     freeHistory();
     freeHashtable();
+    initializeASM(0);
 
     return 1;
 }

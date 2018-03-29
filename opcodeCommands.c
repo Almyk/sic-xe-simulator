@@ -38,7 +38,7 @@ int opInsert(void){
         strcpy(newNode->op, strtok(NULL, delim));
         strcpy(newNode->format, strtok(NULL, delim));
         newNode->next = NULL; newNode->last = NULL;
-        index = hashcode(newNode->op);
+        index = hashcode(newNode->op, HASHSIZE);
         // if there was a collision we add the new node to the end of the list
         if(HASHTABLE[index]){
             ptr = HASHTABLE[index];
@@ -69,7 +69,7 @@ struct opcodeNode* opSearch(char *key, int hashcode){
 int opMnem(char** args){
     // searches for & prints mnemonics from hashtable
     struct opcodeNode* node;
-    node = opSearch(args[1], hashcode(args[1]));
+    node = opSearch(args[1], hashcode(args[1], HASHSIZE));
     if(!node){
         printf("Error: mnemonic not found.\n");
         return -2;
@@ -98,7 +98,7 @@ int opPrintOpcodelist(void){
     return 1;
 }
 
-int hashcode(char* string){
+int hashcode(char* string, int hashsize){
     // this function takes a string,
     // converts it to an integer and determines its hashcode
     int result = 0;
@@ -106,5 +106,5 @@ int hashcode(char* string){
     while(*(string + i)){
         result += (unsigned int)*(string + i++);
     }
-    return result % HASHSIZE;
+    return result % hashsize;
 }

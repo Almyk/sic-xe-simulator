@@ -12,6 +12,7 @@
 #define TOKENBUF 4
 #define MEGA 1048576 // 2^20
 #define HASHSIZE 20
+#define SYMHASHSIZE 47
 
 // Data Structures
 struct historyNode{
@@ -29,11 +30,33 @@ struct opcodeNode{
     struct opcodeNode* last;
 };
 
+struct symbolNode{
+    char label[10];
+    unsigned int loc;
+    struct symbolNode* next;
+    struct symbolNode* last;
+};
+
+struct intermediateRecordNode{
+    unsigned int linenumber;
+    unsigned int loc;
+    unsigned int objectCode;
+    char label[10];
+    char opcode[10];
+    char operand[10];
+    char flag;
+};
+
+extern struct intermediateRecordNode** intermediateRecord;
+extern int imIndex;
+
 // Virtual Memory
 extern unsigned char MEMORY[MEGA];
 
-// Hash table
-extern struct opcodeNode* HASHTABLE[HASHSIZE];
+// Hash tables
+extern struct opcodeNode* HASHTABLE[HASHSIZE]; // Operation Code Table
+extern struct symbolNode* SYMTAB[SYMHASHSIZE]; // Symbol Table
+
 
 /* Function Declerations */
 int runCommand(char**, int);
@@ -53,6 +76,9 @@ int readline(char*, FILE*);
 struct historyNode* getSetHistHead(void);
 int findFile(char*);
 int cmpExtension(const char*, const char*);
+int stringToInt(char*);
+int skipSpaces(char*, int*);
+int getToken(const char*, char*, int*);
 
 
 // Functions regarding memory
@@ -66,7 +92,7 @@ int opInsert(void);
 int opMnem(char**);
 struct opcodeNode* opSearch(char*, int);
 int opPrintOpcodelist(void);
-int hashcode(char*);
+int hashcode(char*, int);
 
 // general shell command function
 int funcHelp(void);
@@ -77,5 +103,8 @@ int funcType(char*);
 
 // assembler functions
 int asmAssemble(char*);
+int asmFirstPass(char*);
+int asmSecondPass(char*);
+void initializeASM(int);
 
 #endif

@@ -280,3 +280,37 @@ int cmpExtension(const char* filename, const char* extension){
 
     return strcmp(filename+filenameLen-extLen, extension);
 }
+
+int stringToInt(char* string){
+    int len = strlen(string);
+    int i;
+    int result = 0;
+    if(len > 0){
+        for(i = len - 1; i >= 0; i--){
+            result += (string[i] - '0') * power(10, len-i-1);
+        }
+    }
+    return result;
+}
+
+int skipSpaces(char* buffer, int* index){
+    /* this function increments index until it finds a non-space character */
+    /* returns how many iterations it performed */
+    int count = 0;
+    while(buffer[*index] == ' ' && buffer[*index] != '\0'){
+        *index += 1;
+        count++;
+    }
+    if(buffer[*index] == '\0') count = -2;
+    return count;
+}
+
+int getToken(const char* buffer, char* token, int* index){
+    int i = 0;
+    while(buffer[*index] != ' ' && buffer[*index] != '\0'){
+        token[i] = buffer[*index];
+        *index += 1; i++;
+    }
+    token[i] = '\0';
+    return i;
+}
