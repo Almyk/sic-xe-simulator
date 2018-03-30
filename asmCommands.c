@@ -47,9 +47,11 @@ void initializeASM(int mode){
                     symDelete = symPtr;
                     symPtr = symPtr->next;
                     free(symDelete);
+                    SYMTAB[i] = NULL;
                 }
             }
         }
+        printf("\n");
     }
     if(mode){
         /* allocate memory for ten intermediate records */
@@ -99,6 +101,30 @@ int asmSymTabInsert(char* label, int loc, int lineNum){
     return 1;
 }
 
+int asmAddIMRecord(int LOCCTR, int* imCount, char* label, char* opcode, char* operand){
+    struct intermediateRecordNode* newRecord;
+
+    /* need to add a check to see if imCount > imIndex */
+    if(!(imCount < imIndex)){
+        intermediateRecord = realloc();
+    }
+
+    newRecord = malloc(sizeof(struct intermediateRecordNode));
+    if(!newRecord){
+        printf("Error when allocating memory for a new IM Record.\n");
+        return -2;
+    }
+    intermediateRecord[*imCount] = newRecord;
+    (*imCount)++;
+    strcpy(newRecord->label, label);
+    strcpy(newRecord->opcode, opcode);
+    strcpy(newRecord->operand, operand);
+    newRecord->linenumber = *imCount;
+    newRecord->loc = LOCCTR;
+
+    return 1;
+}
+
 int asmFirstPass(char* filename){
     char buffer[MAXBUF] = "";
     char label[20], opcode[20], operand[20];
@@ -109,9 +135,6 @@ int asmFirstPass(char* filename){
     int status = 1;
     int LOCCTR = 0;
     int STARTADR = 0;
-
-    /* will probably have to move these to other functions */
-    struct intermediateRecordNode* newRecord;
 
     // reads first line from file
     readline(buffer, fp);
@@ -126,17 +149,9 @@ int asmFirstPass(char* filename){
         STARTADR = stringToInt(operand);
         LOCCTR = STARTADR;
         /* maybe make this into its own function? */
-        /* I think so too, let's make it into a function */
-        /* from here */
-        newRecord = malloc(sizeof(struct intermediateRecordNode));
-        intermediateRecord[imCount] = newRecord;
-        imCount++;
-        strcpy(newRecord->label, label);
-        strcpy(newRecord->opcode, opcode);
-        strcpy(newRecord->operand, operand);
-        newRecord->linenumber = imCount;
-        newRecord->loc = LOCCTR;
-        /* till here */
+        /* created it as below function. */
+        /* still needs polishing */
+        status = asmAddIMRecord(LOCCTR, &imCount, label, opcode, operand);
         if(labelLen){
             /* if label exists we add it to the symbol table */
             status = asmSymTabInsert(label, LOCCTR, imCount);
