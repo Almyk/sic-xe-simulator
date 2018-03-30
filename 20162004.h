@@ -106,5 +106,6 @@ int asmAssemble(char*);
 int asmFirstPass(char*);
 int asmSecondPass(char*);
 void initializeASM(int);
+int asmSymTabInsert(char*, int, int);
 
 #endif
