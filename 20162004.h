@@ -108,6 +108,7 @@ int asmFirstPass(char*);
 int asmSecondPass(char*);
 void initializeASM(int);
 int asmSymTabInsert(char*, int, int);
-int asmAddIMRecord(const int, int*, char*, char*, char*);
+int asmAddIMRecord(const int, int*, char*, char*, char*, char);
+int asmOperandLength(char*);
 
 #endif
