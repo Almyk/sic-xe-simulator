@@ -13,6 +13,7 @@
 #define MEGA 1048576 // 2^20
 #define HASHSIZE 20
 #define SYMHASHSIZE 47
+#define TOKLEN 20
 
 // Data Structures
 struct historyNode{
@@ -31,7 +32,7 @@ struct opcodeNode{
 };
 
 struct symbolNode{
-    char label[10];
+    char label[TOKLEN];
     unsigned int loc;
     struct symbolNode* next;
     struct symbolNode* last;
@@ -41,9 +42,9 @@ struct intermediateRecordNode{
     unsigned int linenumber;
     unsigned int loc;
     unsigned int objectCode;
-    char label[10];
-    char opcode[10];
-    char operand[10];
+    char label[TOKLEN];
+    char opcode[TOKLEN];
+    char operand[TOKLEN];
     char flag;
 };
 
@@ -77,7 +78,7 @@ struct historyNode* getSetHistHead(void);
 int findFile(char*);
 int cmpExtension(const char*, const char*);
 int stringToInt(char*);
-int skipSpaces(char*, int*);
+int skipSpaces(const char*, int*);
 int getToken(const char*, char*, int*);
 
 

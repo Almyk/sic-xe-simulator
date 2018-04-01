@@ -293,7 +293,7 @@ int stringToInt(char* string){
     return result;
 }
 
-int skipSpaces(char* buffer, int* index){
+int skipSpaces(const char* buffer, int* index){
     /* this function increments index until it finds a non-space character */
     /* returns how many iterations it performed */
     int count = 0;
@@ -307,10 +307,11 @@ int skipSpaces(char* buffer, int* index){
 
 int getToken(const char* buffer, char* token, int* index){
     int i = 0;
-    while(buffer[*index] != ' ' && buffer[*index] != '\0'){
+    while(i < TOKLEN && buffer[*index] != ' ' && buffer[*index] != '\0'){
         token[i] = buffer[*index];
         *index += 1; i++;
     }
+    if(buffer[*index] != '\0') skipSpaces(buffer, index);
     token[i] = '\0';
     return i;
 }

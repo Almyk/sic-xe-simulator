@@ -105,8 +105,10 @@ int asmAddIMRecord(int LOCCTR, int* imCount, char* label, char* opcode, char* op
     struct intermediateRecordNode* newRecord;
 
     /* need to add a check to see if imCount > imIndex */
-    if(!(imCount < imIndex)){
-        intermediateRecord = realloc();
+    if(!((*imCount) < imIndex)){
+        /* reallocates memory to extend the imRecord */
+        imIndex *= 2;
+        intermediateRecord = realloc(intermediateRecord, sizeof(struct intermediateRecordNode) * imIndex);
     }
 
     newRecord = malloc(sizeof(struct intermediateRecordNode));
@@ -135,31 +137,74 @@ int asmFirstPass(char* filename){
     int status = 1;
     int LOCCTR = 0;
     int STARTADR = 0;
+    struct opcodeNode* opcodePtr;
 
     // reads first line from file
     readline(buffer, fp);
     labelLen = getToken(buffer, label, &index);
-    skipSpaces(buffer, &index);
     opcodeLen = getToken(buffer, opcode, &index);
-    skipSpaces(buffer, &index);
     operandLen = getToken(buffer, operand, &index);
     printf("%s\t%s\t%s\n", label, opcode, operand);
 
     if(!(strcmp(opcode, "START"))){
+        /* if START, initialize STARTADR and LOCCTR and add to record */
         STARTADR = stringToInt(operand);
         LOCCTR = STARTADR;
-        /* maybe make this into its own function? */
-        /* created it as below function. */
-        /* still needs polishing */
         status = asmAddIMRecord(LOCCTR, &imCount, label, opcode, operand);
+        if(status != 1) return status;
         if(labelLen){
             /* if label exists we add it to the symbol table */
             status = asmSymTabInsert(label, LOCCTR, imCount);
-            if(status != 1){
-                return status;
+            if(status != 1) return status;
+        }
+        /* read new line */
+        readline(buffer, fp);
+        labelLen = getToken(buffer, label, &index);
+        opcodeLen = getToken(buffer, opcode, &index);
+        operandLen = getToken(buffer, operand, &index);
+    }
+    else{
+        LOCCTR = 0;
+    }
+    /* First Pass's Main loop */
+    while(strcmp(opcode, "END")){
+        /* if not a comment */
+        if(strcmp(label, ".")){
+            if(labelLen){
+                /* if label exists we add it to the symbol table */
+                status = asmSymTabInsert(label, LOCCTR, imCount);
+                if(status != 1) return status; /* symbol already exists */
+            }
+            /* search HASHTABLE for opcode */
+            opcodePtr = opSearch(opcode, hashcode(opcode, HASHSIZE));
+            if(opcodePtr){
+            }
+            else if(!(strcmp(opcode, "WORD"))){
+                LOCCTR += 3;
+            }
+            else if(!(strcmp(opcode, "RESW"))){
+                LOCCTR += 3 * stringToInt(operand);
+            }
+            else if(!(strcmp(opcode, "RESB"))){
+                LOCCTR += stringToInt(operand);
+            }
+            else if(!(strcmp(opcode, "BYTE"))){
+                /* "find length of constant in bytes" */
+                /* seems like I will need to create a function
+                   that looks for the structure: C'BLABLA'
+                   and throws an error if it doesn't follow this structure.
+                */
+            }
+            else{
+                printf("Error on line %d: opcode \"%s\" is not a valid opcode.\n", imCount, opcode);
+                return -2;
             }
         }
+        /* write line to IM Record */
+        /* read new line */
     }
+    /* write last line to IM Record */
+    /* save (LOCCTR - STARTADR) as program length */
 
     fclose(fp);
     return status;
