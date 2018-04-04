@@ -305,13 +305,19 @@ int skipSpaces(const char* buffer, int* index){
     return count;
 }
 
-int getToken(const char* buffer, char* token, int* index){
-    int i = 0;
-    while(i < TOKLEN && buffer[*index] != ' ' && buffer[*index] != '\0'){
-        token[i] = buffer[*index];
-        *index += 1; i++;
+int getToken(const char* buffer, char* token, int tokIndex, int* bufIndex){
+    /*
+      This function copies one string from buffer to token,
+      using spaces as a delimiter.
+      tokIndex is given if an offset is needed for the token string,
+      and bufIndex is given as an offset for the buffer string.
+    */
+    int i = tokIndex;
+    while(i < TOKLEN && buffer[*bufIndex] != ' ' && buffer[*bufIndex] != '\0'){
+        token[i] = buffer[*bufIndex];
+        *bufIndex += 1; i++;
     }
-    if(buffer[*index] != '\0') skipSpaces(buffer, index);
+    if(buffer[*bufIndex] != '\0') skipSpaces(buffer, bufIndex);
     token[i] = '\0';
     return i;
 }

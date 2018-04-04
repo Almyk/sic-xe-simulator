@@ -51,7 +51,6 @@ void initializeASM(int mode){
                 }
             }
         }
-        printf("\n");
     }
     if(mode){
         /* allocate memory for ten intermediate records */
@@ -99,7 +98,7 @@ int asmSymTabInsert(char* label, int loc, int lineNum){
     strcpy(newSymbol->label, label);
     newSymbol->loc = loc;
     return 1;
-}
+} // end of asmSecondPass
 
 int asmAddIMRecord(int LOCCTR, int* imCount, char* label, char* opcode, char* operand, char flag){
     struct intermediateRecordNode* newRecord;
@@ -172,10 +171,78 @@ int asmOperandLength(char* operand){
     return result;
 }
 
+int asmIsSymbol(char* input){
+    /*
+      returns 0 if input is a symbol and there is no prefix
+      returns 1 if input is a symbol with prefix
+      list of prefixes: #, @
+    */
+    int len = strlen(input);
+    int i;
+    int result = 1;
+    int isSymbol = 0;
+    int prefix = 0;
+    for(i = 0; i < len && result; i++){
+        /*
+          probably need to think about more cases
+          of how a symbol can appear in the operand
+          current approach is rather naive...
+        */
+
+
+        /* if input contains a number */
+        if(input[i] >= '0' && input[i] <= '9'){
+            result = 0;
+        }
+        /* if not a letter */
+        else if(!(input[i] >= 'A' && input[i] <= 'Z')){
+            /* if not the first index (prefixes can only be in first index) */
+            if(i) result = 0;
+            /* if first character is @, input has to be a symbol */
+            else if(input[i] == '@') isSymbol = 1;
+            else if(input[i] != '#') result = 0;
+            if(result) prefix = 1; // raises prefix flag
+        }
+    }
+    /* if input should have been a symbol but format is wrong */
+    if(isSymbol && !result){
+        /* go here */
+        /* print error */
+    }
+    /* if input is a symbol */
+    else if(result){
+        /* check if it is a register */
+        if(len == 1){
+            switch(input[0]){
+            case 'A':
+            case 'X':
+            case 'L':
+            case 'B':
+            case 'S':
+            case 'T':
+            case 'F': result = 0; break;
+            }
+        }
+        /* if not a register */
+        if(result){
+            if(prefix) return 1;
+            else return 0;
+        }
+        else return -2;
+    }
+}
+
 int asmFirstPass(char* filename){
+    /*
+      this function performs the first pass through the source file.
+      It stores the labels and their respective addresses.
+      The function also keeps an intermediate record that will be used
+      for the second pass through the file.
+    */
     char buffer[MAXBUF] = "";
     char label[20], opcode[20], operand[20];
-    int labelLen, opcodeLen, operandLen;
+    /* go here */
+    int labelLen, opcodeLen, operandLen; // used to check for empty strings
     int i = 0; // used for opcode offset when there is a flag such as: + or @
     int index = 0; // used to index on current input buffer
     int imCount = 0; // this is the line counter, it is updated inside asmAddIMRecord()
@@ -188,11 +255,26 @@ int asmFirstPass(char* filename){
     struct opcodeNode* opcodePtr;
 
     // reads first line from file
+    /* go here */
+    /* I think this have to be made into its own function... */
     readline(buffer, fp);
-    labelLen = getToken(buffer, label, &index);
-    opcodeLen = getToken(buffer, opcode, &index);
-    operandLen = getToken(buffer, operand, &index);
-    printf("First line: %s\t%s\t%s\n", label, opcode, operand);
+    labelLen = getToken(buffer, label, 0, &index);
+    opcodeLen = getToken(buffer, opcode, 0, &index);
+    operandLen = getToken(buffer, operand, 0, &index);
+    /* if not at end of line */
+    if(buffer[index] != '\0'){
+        /* there is an index offset etc after first operand */
+        if(buffer[index] == ','){
+        }
+        /* there is some character but not a comma */
+        else{
+            /* check if last character of operand was a comma */
+            if(operand[operandLen-1] == ','){
+                operand[operandLen] = ' ';
+                operandLen = getToken(buffer, operand, operandLen+1, &index);
+            }
+        }
+    } // end of not at end of line
 
     if(!(strcmp(opcode, "START"))){
         /* if START, initialize STARTADR and LOCCTR and add to record */
@@ -208,10 +290,10 @@ int asmFirstPass(char* filename){
         /* read new line */
         readline(buffer, fp);
         index = 0;
-        labelLen = getToken(buffer, label, &index);
-        opcodeLen = getToken(buffer, opcode, &index);
-        operandLen = getToken(buffer, operand, &index);
-        printf("Second Line: %s\t%s\t%s\n", label, opcode, operand);
+        labelLen = getToken(buffer, label, 0, &index);
+        opcodeLen = getToken(buffer, opcode, 0, &index);
+        operandLen = getToken(buffer, operand, 0, &index);
+        /* printf("Second Line: %s\t%s\t%s\n", label, opcode, operand); */
     }
     else{
         LOCCTR = 0;
@@ -276,20 +358,52 @@ int asmFirstPass(char* filename){
         /* read new line */
         readline(buffer, fp);
         index = 0;
-        labelLen = getToken(buffer, label, &index);
-        opcodeLen = getToken(buffer, opcode, &index);
-        operandLen = getToken(buffer, operand, &index);
+        labelLen = getToken(buffer, label, 0, &index);
+        opcodeLen = getToken(buffer, opcode, 0, &index);
+        operandLen = getToken(buffer, operand, 0, &index);
         flag = '\0';
         loc = LOCCTR;
     }
     /* write last line to IM Record */
     status = asmAddIMRecord(LOCCTR, &imCount, label, opcode, operand, flag);
     /* save (LOCCTR - STARTADR) as program length */
+    int k = 0;
+    for(;k < imCount; k++) printf("LOCCTR %05X: %s\t%s\t%s\n", intermediateRecord[k]->loc, intermediateRecord[k]->label, intermediateRecord[k]->opcode, intermediateRecord[k]->operand);
 
     fclose(fp);
     return status;
 }
 
 int asmSecondPass(char* filename){
+    int imCount = 0;
+    char* opcode;
+    char* operand;
+    struct opcodeNode* opcodePtr;
+
+    /* read first input line */
+    if(!(strcmp(intermediateRecord[imCount]->opcode, "START"))){
+        /* write listing line */
+        /* read next line */
+    }
+    /* write Header record to object program */
+    /* initialize first Text record */
+
+    /* main loop of the Second Pass algorithm */
+    while(strcmp(intermediateRecord[imCount]->opcode, "END")){
+        /* if not a comment */
+        if(intermediateRecord[imCount]->label[0] != '.'){
+            /* search OPTAB for OPCODE */
+            opcode = intermediateRecord[imCount]->opcode;
+            opcodePtr = opSearch(opcode, hashcode(opcode, HASHSIZE));
+            /* if the opcode is found */
+            if(opcodePtr){
+                operand = intermediateRecord[imCount]->operand;
+                /* if there is a symbol in OPERAND field */
+                if(asmIsSymbol(operand)){
+                    /* go here */
+                }
+            }
+        }
+    }
     return 1;
 }

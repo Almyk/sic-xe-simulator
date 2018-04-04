@@ -13,7 +13,7 @@
 #define MEGA 1048576 // 2^20
 #define HASHSIZE 20
 #define SYMHASHSIZE 47
-#define TOKLEN 20
+#define TOKLEN 30
 
 // Data Structures
 struct historyNode{
@@ -79,7 +79,7 @@ int findFile(char*);
 int cmpExtension(const char*, const char*);
 int stringToInt(char*);
 int skipSpaces(const char*, int*);
-int getToken(const char*, char*, int*);
+int getToken(const char*, char*, int, int*);
 
 
 // Functions regarding memory
@@ -110,5 +110,6 @@ void initializeASM(int);
 int asmSymTabInsert(char*, int, int);
 int asmAddIMRecord(const int, int*, char*, char*, char*, char);
 int asmOperandLength(char*);
+int asmIsSymbol(char*);
 
 #endif
