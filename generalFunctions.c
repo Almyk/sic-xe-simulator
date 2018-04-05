@@ -313,6 +313,12 @@ int getToken(const char* buffer, char* token, int tokIndex, int* bufIndex){
       and bufIndex is given as an offset for the buffer string.
     */
     int i = tokIndex;
+
+    if(buffer[*bufIndex] == '.'){ // if line is a comment
+        token[i] = '.';
+        token[i+1] = '\0';
+        return -1;
+    }
     while(i < TOKLEN && buffer[*bufIndex] != ' ' && buffer[*bufIndex] != '\0'){
         token[i] = buffer[*bufIndex];
         *bufIndex += 1; i++;

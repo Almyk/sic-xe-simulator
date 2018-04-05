@@ -74,7 +74,7 @@ int asmSymTabInsert(char* label, int loc, int lineNum){
             if(!(strcmp(symbolPtr->label, label))){
                 /* raise flag, print and return */
                 /* print current line and what the error is */
-                printf("Error: On line %d a duplicate of %s was found.\n", lineNum, label);
+                printf("Error: On line %d a duplicate of symbol %s was found.\n", lineNum, label);
                 printf("\tAborting the assemble.\n");
                 return -2;
             }
@@ -100,7 +100,7 @@ int asmSymTabInsert(char* label, int loc, int lineNum){
     return 1;
 } // end of asmSecondPass
 
-int asmAddIMRecord(int LOCCTR, int* imCount, char* label, char* opcode, char* operand, char flag){
+int asmAddIMRecord(int LOCCTR, int* imCount, char* label, char* opcode, char* operand, char* buffer, char flag){
     struct intermediateRecordNode* newRecord;
 
     /* need to add a check to see if imCount > imIndex */
@@ -120,6 +120,7 @@ int asmAddIMRecord(int LOCCTR, int* imCount, char* label, char* opcode, char* op
     strcpy(newRecord->label, label);
     strcpy(newRecord->opcode, opcode);
     strcpy(newRecord->operand, operand);
+    strcpy(newRecord->buffer, buffer);
     newRecord->linenumber = *imCount;
     newRecord->loc = LOCCTR;
     newRecord->flag = flag;
@@ -223,13 +224,44 @@ int asmIsSymbol(char* input){
             case 'F': result = 0; break;
             }
         }
-        /* if not a register */
-        if(result){
-            if(prefix) return 1;
-            else return 0;
-        }
-        else return -2;
+        /* if it is a register */
+        if(!result) return -2;
     }
+    if(prefix) return 1;
+    else return 0;
+}
+
+int asmParseLine(char* buffer, char* label, char* opcode, char* operand){
+    int labelLen, opcodeLen, operandLen;
+    int index = 0;
+    int result = 1;
+    int isComment = 0;
+
+    labelLen = getToken(buffer, label, 0, &index); // label field
+    if(labelLen < 0) isComment = 1;
+    opcodeLen = getToken(buffer, opcode, 0, &index); // opcode field
+    if( opcodeLen < 0) isComment = 1;
+    operandLen = getToken(buffer, operand, 0, &index); // operand field
+    /* if not at end of line */
+    if(!isComment && buffer[index] != '\0'){
+        printf("buffer[%d]: %c\n", index, buffer[index]);
+        /* there is an index offset etc after first operand */
+        if(buffer[index] == ','){
+        }
+        /* there is some character but not a comma */
+        else{
+            /* check if last character of operand was a comma */
+            if(operand[operandLen-1] == ','){
+                operand[operandLen] = ' ';
+                operandLen = getToken(buffer, operand, operandLen+1, &index);
+            }
+            else{
+                /* there is some error in the assembly code */
+                result = 0;
+            }
+        }
+    } // end of not at end of line
+    return result;
 }
 
 int asmFirstPass(char* filename){
@@ -240,11 +272,11 @@ int asmFirstPass(char* filename){
       for the second pass through the file.
     */
     char buffer[MAXBUF] = "";
-    char label[20], opcode[20], operand[20];
+    char label[TOKLEN], opcode[TOKLEN], operand[TOKLEN];
     /* go here */
-    int labelLen, opcodeLen, operandLen; // used to check for empty strings
+    //int labelLen, opcodeLen, operandLen; // used to check for empty strings
     int i = 0; // used for opcode offset when there is a flag such as: + or @
-    int index = 0; // used to index on current input buffer
+    //int index = 0; // used to index on current input buffer
     int imCount = 0; // this is the line counter, it is updated inside asmAddIMRecord()
     FILE* fp = fopen(filename, "r");
     int status = 1;
@@ -258,42 +290,38 @@ int asmFirstPass(char* filename){
     /* go here */
     /* I think this have to be made into its own function... */
     readline(buffer, fp);
-    labelLen = getToken(buffer, label, 0, &index);
-    opcodeLen = getToken(buffer, opcode, 0, &index);
-    operandLen = getToken(buffer, operand, 0, &index);
-    /* if not at end of line */
-    if(buffer[index] != '\0'){
-        /* there is an index offset etc after first operand */
-        if(buffer[index] == ','){
-        }
-        /* there is some character but not a comma */
-        else{
-            /* check if last character of operand was a comma */
-            if(operand[operandLen-1] == ','){
-                operand[operandLen] = ' ';
-                operandLen = getToken(buffer, operand, operandLen+1, &index);
-            }
-        }
-    } // end of not at end of line
+    status = asmParseLine(buffer, label, opcode, operand);
+    if(status == 0){
+        printf("Error on line %d: There is something wrong with the assembly syntax.\n", imCount);
+        printf("Buffer: %s\n", buffer);
+        return -2;
+    }
+    else if(status < 0){ // line is a comment
+        flag = 'c';
+    }
 
     if(!(strcmp(opcode, "START"))){
         /* if START, initialize STARTADR and LOCCTR and add to record */
         STARTADR = stringToInt(operand);
         LOCCTR = STARTADR;
-        status = asmAddIMRecord(LOCCTR, &imCount, label, opcode, operand, flag);
+        status = asmAddIMRecord(LOCCTR, &imCount, label, opcode, operand, buffer, flag);
         if(status != 1) return status;
-        if(labelLen){
+        if(strlen(label) > 0){
             /* if label exists we add it to the symbol table */
             status = asmSymTabInsert(label, LOCCTR, imCount);
             if(status != 1) return status;
         }
         /* read new line */
         readline(buffer, fp);
-        index = 0;
-        labelLen = getToken(buffer, label, 0, &index);
-        opcodeLen = getToken(buffer, opcode, 0, &index);
-        operandLen = getToken(buffer, operand, 0, &index);
-        /* printf("Second Line: %s\t%s\t%s\n", label, opcode, operand); */
+        status = asmParseLine(buffer, label, opcode, operand);
+        if(status == 0){
+            printf("Error on line %d: There is something wrong with the assembly syntax.\n", imCount);
+            printf("Buffer: %s\n", buffer);
+            return -2;
+        }
+        else if(status < 0){ // line is a comment
+            flag = 'c';
+        }
     }
     else{
         LOCCTR = 0;
@@ -303,8 +331,8 @@ int asmFirstPass(char* filename){
     while(strcmp(opcode, "END")){
         i = 0;
         /* if not a comment */
-        if(strcmp(label, ".")){
-            if(labelLen){
+        if(strcmp(label, ".") && flag != 'c'){
+            if(strlen(label) > 0){
                 /* if label exists we add it to the symbol table */
                 status = asmSymTabInsert(label, LOCCTR, imCount);
                 if(status != 1) return status; /* symbol already exists */
@@ -353,19 +381,24 @@ int asmFirstPass(char* filename){
         }
         /* write line to IM Record */
         /* use loc instead of LOCCTR when writing to IM record */
-        status = asmAddIMRecord(loc, &imCount, label, opcode, operand, flag);
+        status = asmAddIMRecord(loc, &imCount, label, opcode, operand, buffer, flag);
+        loc = LOCCTR;
+        flag = '\0';
 
         /* read new line */
         readline(buffer, fp);
-        index = 0;
-        labelLen = getToken(buffer, label, 0, &index);
-        opcodeLen = getToken(buffer, opcode, 0, &index);
-        operandLen = getToken(buffer, operand, 0, &index);
-        flag = '\0';
-        loc = LOCCTR;
+        status = asmParseLine(buffer, label, opcode, operand);
+        if(status == 0){
+            printf("Error on line %d: There is something wrong with the assembly syntax.\n", imCount);
+            printf("Buffer: %s\n", buffer);
+            return -2;
+        }
+        else if(status < 0){ // line is a comment
+            flag = 'c';
+        }
     }
     /* write last line to IM Record */
-    status = asmAddIMRecord(LOCCTR, &imCount, label, opcode, operand, flag);
+    status = asmAddIMRecord(LOCCTR, &imCount, label, opcode, operand, buffer, flag);
     /* save (LOCCTR - STARTADR) as program length */
     int k = 0;
     for(;k < imCount; k++) printf("LOCCTR %05X: %s\t%s\t%s\n", intermediateRecord[k]->loc, intermediateRecord[k]->label, intermediateRecord[k]->opcode, intermediateRecord[k]->operand);

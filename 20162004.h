@@ -42,9 +42,11 @@ struct intermediateRecordNode{
     unsigned int linenumber;
     unsigned int loc;
     unsigned int objectCode;
+    int isComment;
     char label[TOKLEN];
     char opcode[TOKLEN];
     char operand[TOKLEN];
+    char buffer[MAXBUF];
     char flag;
 };
 
@@ -108,8 +110,9 @@ int asmFirstPass(char*);
 int asmSecondPass(char*);
 void initializeASM(int);
 int asmSymTabInsert(char*, int, int);
-int asmAddIMRecord(const int, int*, char*, char*, char*, char);
+int asmAddIMRecord(const int, int*, char*, char*, char*, char*, char);
 int asmOperandLength(char*);
 int asmIsSymbol(char*);
+int asmParseLine(char*, char*, char*, char*);
 
 #endif
