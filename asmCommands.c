@@ -238,13 +238,16 @@ int asmParseLine(char* buffer, char* label, char* opcode, char* operand){
     int isComment = 0;
 
     labelLen = getToken(buffer, label, 0, &index); // label field
-    if(labelLen < 0) isComment = 1;
+    if(labelLen < 0){
+        isComment = 1;
+    }
     opcodeLen = getToken(buffer, opcode, 0, &index); // opcode field
-    if( opcodeLen < 0) isComment = 1;
+    if(opcodeLen < 0){
+        isComment = 1;
+    }
     operandLen = getToken(buffer, operand, 0, &index); // operand field
     /* if not at end of line */
     if(!isComment && buffer[index] != '\0'){
-        printf("buffer[%d]: %c\n", index, buffer[index]);
         /* there is an index offset etc after first operand */
         if(buffer[index] == ','){
         }
@@ -273,10 +276,7 @@ int asmFirstPass(char* filename){
     */
     char buffer[MAXBUF] = "";
     char label[TOKLEN], opcode[TOKLEN], operand[TOKLEN];
-    /* go here */
-    //int labelLen, opcodeLen, operandLen; // used to check for empty strings
     int i = 0; // used for opcode offset when there is a flag such as: + or @
-    //int index = 0; // used to index on current input buffer
     int imCount = 0; // this is the line counter, it is updated inside asmAddIMRecord()
     FILE* fp = fopen(filename, "r");
     int status = 1;
@@ -287,8 +287,6 @@ int asmFirstPass(char* filename){
     struct opcodeNode* opcodePtr;
 
     // reads first line from file
-    /* go here */
-    /* I think this have to be made into its own function... */
     readline(buffer, fp);
     status = asmParseLine(buffer, label, opcode, operand);
     if(status == 0){
