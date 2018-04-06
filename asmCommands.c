@@ -1,8 +1,26 @@
 #include "20162004.h"
 
-// global variable
+/**** global variables ****/
+
+/* variables regarding the intermediate record */
 struct intermediateRecordNode** intermediateRecord;
-int imIndex = 0; // keeps track of how many entries are allocated
+int imIndex = 0; // how many entries there is memory allocated for
+int imCount = 0; // how many entries there are in intermediateRecord
+
+/* variables regarding program's memory addressing */
+int STARTADR = 0; // start address of program
+int ENDADR = 0; // end address of program
+int PLENGTH = 0; // length of program
+
+/*
+  NOBASE is for BASE-Relative addressing
+  if NOBASE == 1, we can't use base-relative addressing
+  if NOBASE == 0, it is possible to use base-relative addressing
+*/
+int NOBASE = 1;
+
+
+/* ---------------------------- */
 
 int asmAssemble(char* filename){
     int status = 0;
@@ -14,12 +32,24 @@ int asmAssemble(char* filename){
         if(!status){
             initializeASM(1);
             status = asmFirstPass(filename);
+            if(status > 0){ // first pass was succesful
+            }
         }
         // incorrect extension
-        else status = -8;
+        else{
+            /* status = -8; */
+            /* move error message so that command can be added to history correctly */
+            status = 1;
+            printf("Error: file is not a '.asm' file.\n");
+        }
     }
     // file not found
-    else status = -7;
+    else{
+        /* status = -7; */
+        /* move error message so that command can be added to history correctly */
+        status = 1;
+        printf("Error: file not found.\n");
+    }
 
     return status;
 }
@@ -56,7 +86,8 @@ void initializeASM(int mode){
         /* allocate memory for ten intermediate records */
         intermediateRecord = (struct intermediateRecordNode**)\
             calloc(10, sizeof(struct intermediateRecordNode*)); /*line too long*/
-        imIndex = 10;
+        /* initialize global variables related to program */
+        imIndex = 10; STARTADR = 0; ENDADR = 0; imCount = 0; PLENGTH = 0;
     }
 }
 
@@ -277,12 +308,10 @@ int asmFirstPass(char* filename){
     char buffer[MAXBUF] = "";
     char label[TOKLEN], opcode[TOKLEN], operand[TOKLEN];
     int i = 0; // used for opcode offset when there is a flag such as: + or @
-    int imCount = 0; // this is the line counter, it is updated inside asmAddIMRecord()
     FILE* fp = fopen(filename, "r");
     int status = 1;
     int LOCCTR = 0;
     int loc = 0;
-    int STARTADR = 0;
     char flag = '\0';
     struct opcodeNode* opcodePtr;
 
@@ -397,19 +426,42 @@ int asmFirstPass(char* filename){
     }
     /* write last line to IM Record */
     status = asmAddIMRecord(LOCCTR, &imCount, label, opcode, operand, buffer, flag);
-    /* save (LOCCTR - STARTADR) as program length */
+    /* store end address and program length in the global variables */
+    ENDADR = LOCCTR;
+    PLENGTH = LOCCTR - STARTADR;
+
     int k = 0;
     for(;k < imCount; k++) printf("LOCCTR %05X: %s\t%s\t%s\n", intermediateRecord[k]->loc, intermediateRecord[k]->label, intermediateRecord[k]->opcode, intermediateRecord[k]->operand);
 
     fclose(fp);
     return status;
-}
+} // end of asmFirstPass
 
 int asmSecondPass(char* filename){
-    int imCount = 0;
     char* opcode;
     char* operand;
     struct opcodeNode* opcodePtr;
+    FILE *lstFPtr;
+    FILE *objFPtr;
+    char* lstFilename;
+    char* objFilename;
+    int len = strlen(filename);
+
+    /*
+     * Allocate memory for the filenames:
+     * filename.lst ; filename.obj
+     * and copy name from filename but change extension
+    */
+    lstFilename = calloc(len+1, sizeof(char));
+    objFilename = calloc(len+1, sizeof(char));
+    strcpy(lstFilename, filename);
+    strcpy(objFilename, filename);
+    strcat(lstFilename+len-3, "lst");
+    strcat(objFilename+len-3, "obj");
+
+    /* open list and object files */
+    lstFPtr = fopen(lstFilename, "w");
+    objFPtr = fopen(objFilename, "w");
 
     /* read first input line */
     if(!(strcmp(intermediateRecord[imCount]->opcode, "START"))){
