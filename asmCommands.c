@@ -2,6 +2,8 @@
 
 /**** global variables ****/
 
+struct textRecordNode TRHEAD;
+
 /* variables regarding the intermediate record */
 struct intermediateRecordNode** intermediateRecord;
 int imIndex = 0; // how many entries there is memory allocated for
@@ -33,6 +35,7 @@ int asmAssemble(char* filename){
             initializeASM(1);
             status = asmFirstPass(filename);
             if(status > 0){ // first pass was succesful
+                asmSecondPass(filename);
             }
         }
         // incorrect extension
@@ -203,17 +206,19 @@ int asmOperandLength(char* operand){
     return result;
 }
 
-int asmIsSymbol(char* input){
+int asmCheckSymbol(char* input, int len){
     /*
-      returns 0 if input is a symbol and there is no prefix
-      returns 1 if input is a symbol with prefix
-      list of prefixes: #, @
+      returns 1 if input is a symbol and there is no prefix
+      returns 2 if input is a symbol with @ prefix
+      returns 3 if input is a symbol with # prefix
+      returns 0 if not a symbol
+      returns a negative value in case of error
     */
-    int len = strlen(input);
     int i;
     int result = 1;
     int isSymbol = 0;
     int prefix = 0;
+
     for(i = 0; i < len && result; i++){
         /*
           probably need to think about more cases
@@ -231,9 +236,14 @@ int asmIsSymbol(char* input){
             /* if not the first index (prefixes can only be in first index) */
             if(i) result = 0;
             /* if first character is @, input has to be a symbol */
-            else if(input[i] == '@') isSymbol = 1;
-            else if(input[i] != '#') result = 0;
-            if(result) prefix = 1; // raises prefix flag
+            else if(input[i] == '@'){
+                isSymbol = 1;
+                prefix = 1;
+            }
+            else if(input[i] == '#'){
+                prefix = 2;
+            }
+            else result = 0;
         }
     }
     /* if input should have been a symbol but format is wrong */
@@ -256,10 +266,47 @@ int asmIsSymbol(char* input){
             }
         }
         /* if it is a register */
-        if(!result) return -2;
+        if(!result) return 0;
     }
-    if(prefix) return 1;
-    else return 0;
+    if(prefix == 1) return 2;
+    if(prefix == 2) return 3;
+    else return 1;
+}
+
+int asmIsSymbol(char* input){
+    /*
+      returns 1 if word1 is a symbol
+      returns 2 if word2 is a symbol
+      returns 3 if both words are symbols
+      returns 0 if no symbols
+      returns negative if error
+    */
+    int len = strlen(input);
+    char tmpBuf[TOKLEN];
+    char *word1, *word2;
+    int w1Result, w2Result;
+    int w1Len, w2Len;
+    int result = 0;
+
+    if(len > 0){
+        strcpy(tmpBuf, input);
+        word1 = strtok(tmpBuf, ", ");
+        word2 = strtok(NULL, ", ");
+        w1Len = strlen(word1);
+        w2Len = strlen(word2);
+    }
+    else return 0; // empty string
+
+    if(w1Len) w1Result = asmCheckSymbol(word1, w1Len);
+    if(w2Len) w2Result = asmCheckSymbol(word2, w2Len);
+    if(w1Result > 0) result = 1;
+    if(w2Result > 0) result += 2;
+
+    /* if there was an error */
+    if(w1Result < 0 || w2Result < 0){
+        result = -2;
+    }
+    return result;
 }
 
 int asmParseLine(char* buffer, char* label, char* opcode, char* operand){
@@ -400,6 +447,10 @@ int asmFirstPass(char* filename){
                 // this is used together with base relative opcodes
                 /* go here */
             }
+            else if(!(strcmp(opcode+i, "NOBASE"))){
+                // this is used together with base relative opcodes
+                /* go here */
+            }
             else{
                 printf("Error on line %d: opcode \"%s\" is not a valid opcode.\n", imCount, opcode);
                 printf("buffer: %s\n", buffer);
@@ -438,49 +489,78 @@ int asmFirstPass(char* filename){
 } // end of asmFirstPass
 
 int asmSecondPass(char* filename){
-    char* opcode;
     char* operand;
     struct opcodeNode* opcodePtr;
     FILE *lstFPtr;
     FILE *objFPtr;
     char* lstFilename;
     char* objFilename;
-    int len = strlen(filename);
+    int len;
+    int index = 0;
+    struct intermediateRecordNode* imrPtr = NULL;
+    struct textRecordNode* trPtr = NULL;
+    int trIndex = 0; // text record index
+    unsigned int trStart = NULL; // to keep track of where text record start
+    unsigned int trLength = 0; // length of text record
+    struct textRecordNode* currentTR = NULL;
+    struct textRecordNode* newTR = NULL;
 
     /*
      * Allocate memory for the filenames:
      * filename.lst ; filename.obj
      * and copy name from filename but change extension
     */
+
+    /* need to move this to end of this function */
+    len = strlen(filename);
     lstFilename = calloc(len+1, sizeof(char));
     objFilename = calloc(len+1, sizeof(char));
     strcpy(lstFilename, filename);
     strcpy(objFilename, filename);
-    strcat(lstFilename+len-3, "lst");
-    strcat(objFilename+len-3, "obj");
+    strcpy(lstFilename+len-3, "lst");
+    strcpy(objFilename+len-3, "obj");
 
     /* open list and object files */
     lstFPtr = fopen(lstFilename, "w");
     objFPtr = fopen(objFilename, "w");
 
     /* read first input line */
-    if(!(strcmp(intermediateRecord[imCount]->opcode, "START"))){
-        /* write listing line */
+    if(!(strcmp(intermediateRecord[index]->opcode, "START"))){
+        /* since listing file is created from the intermediate record
+           after all of the code is parsed, we only need to advance index */
+        imrPtr = intermediateRecord[index];
+
+        /* go here, this should be moved to end of function */
+        /* /\* write listing line *\/ */
+        /* fprintf(lstFPtr, "%3d\t%04X\t%6s\t%6s\t%s\n", 5*(index+1), imrPtr->loc, imrPtr->label, imrPtr->opcode, imrPtr->operand); */
+
         /* read next line */
+        index++;
     }
-    /* write Header record to object program */
+    /* store Header to later record to object file */
+    sprintf(TRHEAD.record, "H%-6s%06X%06X\n", (imrPtr ? imrPtr->label : ""), STARTADR, PLENGTH);
+
+    /* move this  to end of function */
+    /* fprintf(objFPtr, "H%-6s%06X%06X\n", (imrPtr ? imrPtr->label : ""), STARTADR, PLENGTH); */
+
     /* initialize first Text record */
+    newTR = TRALLOC();
+    newTR->next = NULL;
+    TRHEAD.next = newTR;
+    newTR->record[0] = 'T';
+    currentTR = newTR;
 
     /* main loop of the Second Pass algorithm */
-    while(strcmp(intermediateRecord[imCount]->opcode, "END")){
+    while(strcmp(intermediateRecord[index]->opcode, "END")){
+        trIndex = 1; // initialize text record index
+        imrPtr = intermediateRecord[index];
         /* if not a comment */
-        if(intermediateRecord[imCount]->label[0] != '.'){
+        if(imrPtr->label[0] != '.' && imrPtr->flag != 'c'){
             /* search OPTAB for OPCODE */
-            opcode = intermediateRecord[imCount]->opcode;
-            opcodePtr = opSearch(opcode, hashcode(opcode, HASHSIZE));
+            opcodePtr = opSearch(imrPtr->opcode, hashcode(imrPtr->opcode, HASHSIZE));
             /* if the opcode is found */
             if(opcodePtr){
-                operand = intermediateRecord[imCount]->operand;
+                operand = imrPtr->operand;
                 /* if there is a symbol in OPERAND field */
                 if(asmIsSymbol(operand)){
                     /* go here */
@@ -488,5 +568,11 @@ int asmSecondPass(char* filename){
             }
         }
     }
+    /***** WRITE TO FILE *****/
+    fclose(lstFPtr);
+    fclose(objFPtr);
     return 1;
+}
+
+void asmCreateObjectCode(void){
 }

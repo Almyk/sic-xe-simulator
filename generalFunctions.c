@@ -327,3 +327,7 @@ int getToken(const char* buffer, char* token, int tokIndex, int* bufIndex){
     token[i] = '\0';
     return i;
 }
+
+struct textRecordNode* TRALLOC(void){
+    return (struct textRecordNode*) malloc(sizeof(struct textRecordNode));
+}

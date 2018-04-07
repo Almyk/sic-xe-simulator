@@ -50,6 +50,11 @@ struct intermediateRecordNode{
     char flag;
 };
 
+struct textRecordNode{
+    char record[70];
+    struct textRecordNode* next;
+};
+
 extern struct intermediateRecordNode** intermediateRecord;
 extern int imIndex;
 
@@ -82,6 +87,7 @@ int cmpExtension(const char*, const char*);
 int stringToInt(char*);
 int skipSpaces(const char*, int*);
 int getToken(const char*, char*, int, int*);
+struct textRecordNode* TRALLOC(void);
 
 
 // Functions regarding memory
