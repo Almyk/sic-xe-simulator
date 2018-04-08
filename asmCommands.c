@@ -174,7 +174,7 @@ int asmAddIMRecord(int LOCCTR, int* imCount, char* label, char* opcode, char* op
     strcpy(newRecord->opcode, opcode);
     strcpy(newRecord->operand, operand);
     strcpy(newRecord->buffer, buffer);
-    newRecord->linenumber = *imCount;
+    newRecord->linenumber = (*imCount)*5;
     newRecord->loc = LOCCTR;
     newRecord->n = 1;
     newRecord->i = 1;
@@ -370,6 +370,7 @@ int asmParseLine(char* buffer, char* label, char* opcode, char* operand){
             }
         }
     } // end of not at end of line
+    if(isComment) return -1;
     return result;
 }
 
@@ -551,24 +552,6 @@ int asmSecondPass(char* filename){
     unsigned int operAdr = 0;
     int notasymbol = 0;
 
-    /*
-     * Allocate memory for the filenames:
-     * filename.lst ; filename.obj
-     * and copy name from filename but change extension
-    */
-
-    /* need to move this to end of this function */
-    len = strlen(filename);
-    lstFilename = calloc(len+1, sizeof(char));
-    objFilename = calloc(len+1, sizeof(char));
-    strcpy(lstFilename, filename);
-    strcpy(objFilename, filename);
-    strcpy(lstFilename+len-3, "lst");
-    strcpy(objFilename+len-3, "obj");
-
-    /* open list and object files */
-    lstFPtr = fopen(lstFilename, "w");
-    objFPtr = fopen(objFilename, "w");
 
     /* read first input line */
     if(!(strcmp(intermediateRecord[index]->opcode, "START"))){
@@ -576,9 +559,6 @@ int asmSecondPass(char* filename){
            after all of the code is parsed, we only need to advance index */
         imrPtr = intermediateRecord[index];
 
-        /* go here, this should be moved to end of function */
-        /* /\* write listing line *\/ */
-        /* fprintf(lstFPtr, "%3d\t%04X\t%6s\t%6s\t%s\n", 5*(index+1), imrPtr->loc, imrPtr->label, imrPtr->opcode, imrPtr->operand); */
 
         /* read next line */
         index++;
@@ -603,9 +583,6 @@ int asmSecondPass(char* filename){
         trIndex = 1; // initialize text record index
         prefix = 0;
         imrPtr = intermediateRecord[index];
-        /* printf("(%d) BARNKALAS\n",(index+1)*5); */
-        /* printf("(%d)status : %d\n", (index+1)*5, status); */
-        /* printf("Buf: %s\n", imrPtr->buffer); */
         /* if not a comment */
         if(imrPtr->flag != 'c'){
             /* search OPTAB for OPCODE */
@@ -740,6 +717,46 @@ int asmSecondPass(char* filename){
         index++;
     } // while not END
     /***** WRITE TO FILE *****/
+    /*
+     * Allocate memory for the filenames:
+     * filename.lst ; filename.obj
+     * and copy name from filename but change extension
+     */
+
+    /* need to move this to end of this function */
+    len = strlen(filename);
+    lstFilename = calloc(len+1, sizeof(char));
+    objFilename = calloc(len+1, sizeof(char));
+    strcpy(lstFilename, filename);
+    strcpy(objFilename, filename);
+    strcpy(lstFilename+len-3, "lst");
+    strcpy(objFilename+len-3, "obj");
+
+    /* open list and object files */
+    lstFPtr = fopen(lstFilename, "w");
+    objFPtr = fopen(objFilename, "w");
+
+    int i;
+    /* write listing line */
+    for(i = 0; i < imCount; i++){
+        imrPtr = intermediateRecord[i];
+        if(imrPtr->flag == 'c'){
+            fprintf(lstFPtr, "%3d\t%s\n", imrPtr->linenumber, imrPtr->buffer);
+        }
+        else if(imrPtr->x){
+            fprintf(lstFPtr, "%3d\t%04X\t%6s\t%6s\t%s\t%X\n", imrPtr->linenumber, imrPtr->loc, imrPtr->label, imrPtr->opcode, imrPtr->operand, (unsigned int)imrPtr->objectCode);
+        }
+        else if(imrPtr->objectCode == 0){
+            fprintf(lstFPtr, "%3d\t%04X\t%6s\t%6s\t%s\n", imrPtr->linenumber, imrPtr->loc, imrPtr->label, imrPtr->opcode, imrPtr->operand);
+        }
+        else{
+            fprintf(lstFPtr, "%3d\t%04X\t%6s\t%6s\t%s\t\t%X\n", imrPtr->linenumber, imrPtr->loc, imrPtr->label, imrPtr->opcode, imrPtr->operand, (unsigned int)imrPtr->objectCode);
+        }
+    }
+
+    /* close files and free memory */
+    free(lstFilename);
+    free(objFilename);
     fclose(lstFPtr);
     fclose(objFPtr);
     return 1;
