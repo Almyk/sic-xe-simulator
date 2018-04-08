@@ -529,6 +529,7 @@ int asmFirstPass(char* filename){
 
 int asmSecondPass(char* filename){
     int status = 1;
+    int i;
     char* operand;
     char tmpOperand[TOKLEN];
     char *op1, *op2;
@@ -558,16 +559,12 @@ int asmSecondPass(char* filename){
         /* since listing file is created from the intermediate record
            after all of the code is parsed, we only need to advance index */
         imrPtr = intermediateRecord[index];
-
-
         /* read next line */
         index++;
     }
     /* store Header to later record to object file */
     sprintf(TRHEAD.record, "H%-6s%06X%06X\n", (imrPtr ? imrPtr->label : ""), STARTADR, PLENGTH);
 
-    /* move this  to end of function */
-    /* fprintf(objFPtr, "H%-6s%06X%06X\n", (imrPtr ? imrPtr->label : ""), STARTADR, PLENGTH); */
 
     /* initialize first Text record */
     newTR = TRALLOC();
@@ -575,12 +572,11 @@ int asmSecondPass(char* filename){
     TRHEAD.next = newTR;
     newTR->record[0] = 'T';
     currentTR = newTR;
+    trIndex = 1; // initialize text record index
 
     /* main loop of the Second Pass algorithm */
     while(strcmp(intermediateRecord[index]->opcode, "END")){
         /* go here */
-        // setting trIndex to 1 every iteration surely must be wrong??
-        trIndex = 1; // initialize text record index
         prefix = 0;
         imrPtr = intermediateRecord[index];
         /* if not a comment */
@@ -694,7 +690,10 @@ int asmSecondPass(char* filename){
                 }
                 /* assemble the object code instruction */
                 /* go here */
-                asmCreateObjectCode(operAdr, imrPtr, opcodePtr, intermediateRecord[index+1]->loc, notasymbol);
+                status = asmCreateObjectCode(operAdr, imrPtr, opcodePtr, intermediateRecord[index+1]->loc, notasymbol);
+                if(status <= 0){ // there was some error
+                    return 1;
+                }
                 notasymbol = 0; // reset notasymbol
             } // end of if OPCODE found
             /* go here */
@@ -713,7 +712,20 @@ int asmSecondPass(char* filename){
             else if(!strcmp(imrPtr->opcode, "BYTE")){
                 asmByteObjectCodeCreator(imrPtr);
             }
-        }
+            /* go here */
+            /* store objectcode into text record */
+            if(imrPtr->objectCode){
+                trLength = intermediateRecord[index+1]->loc - imrPtr->loc;
+                if((trLength + trIndex) > 70){
+                }
+
+
+                trIndex += trLength;
+            }
+
+            //printf("Objectcode: %02X\n", (unsigned int)imrPtr->objectCode);
+
+        } // (if not a comment)
         index++;
     } // while not END
     /***** WRITE TO FILE *****/
@@ -736,24 +748,34 @@ int asmSecondPass(char* filename){
     lstFPtr = fopen(lstFilename, "w");
     objFPtr = fopen(objFilename, "w");
 
-    int i;
-    /* write listing line */
+    /*~~ write listing line ~~*/
     for(i = 0; i < imCount; i++){
         imrPtr = intermediateRecord[i];
-        if(imrPtr->flag == 'c'){
-            fprintf(lstFPtr, "%3d\t%s\n", imrPtr->linenumber, imrPtr->buffer);
+        if(i == imCount - 1){
+            fprintf(lstFPtr, "%3d\t\t%-6s\t%-6s\t%s\n", imrPtr->linenumber, imrPtr->label, imrPtr->opcode, imrPtr->operand);
+            break;
         }
-        else if(imrPtr->x){
-            fprintf(lstFPtr, "%3d\t%04X\t%6s\t%6s\t%s\t%X\n", imrPtr->linenumber, imrPtr->loc, imrPtr->label, imrPtr->opcode, imrPtr->operand, (unsigned int)imrPtr->objectCode);
+        if(imrPtr->flag == 'c'){ // if it is a comment
+            fprintf(lstFPtr, "%3d\t\t%s\n", imrPtr->linenumber, imrPtr->buffer);
         }
-        else if(imrPtr->objectCode == 0){
-            fprintf(lstFPtr, "%3d\t%04X\t%6s\t%6s\t%s\n", imrPtr->linenumber, imrPtr->loc, imrPtr->label, imrPtr->opcode, imrPtr->operand);
+        else if(imrPtr->x){ // if printed with indexed addressing
+            fprintf(lstFPtr, "%3d\t%04X\t%-6s\t%-6s\t%s\t%02X\n", imrPtr->linenumber, imrPtr->loc, imrPtr->label, imrPtr->opcode, imrPtr->operand, (unsigned int)imrPtr->objectCode);
         }
-        else{
-            fprintf(lstFPtr, "%3d\t%04X\t%6s\t%6s\t%s\t\t%X\n", imrPtr->linenumber, imrPtr->loc, imrPtr->label, imrPtr->opcode, imrPtr->operand, (unsigned int)imrPtr->objectCode);
+        else if(imrPtr->objectCode == 0){ // no objectcode to print
+            if(intermediateRecord[i+1]->loc - imrPtr->loc)
+                fprintf(lstFPtr, "%3d\t%04X\t%-6s\t%-6s\t%s\n", imrPtr->linenumber, imrPtr->loc, imrPtr->label, imrPtr->opcode, imrPtr->operand);
+            else // no LOCCTR to print
+                fprintf(lstFPtr, "%3d\t\t%-6s\t%-6s\t%s\n", imrPtr->linenumber, imrPtr->label, imrPtr->opcode, imrPtr->operand);
+        }
+        else{ // normal print
+            fprintf(lstFPtr, "%3d\t%04X\t%-6s\t%-6s\t%s\t\t%02X\n", imrPtr->linenumber, imrPtr->loc, imrPtr->label, imrPtr->opcode, imrPtr->operand, (unsigned int)imrPtr->objectCode);
         }
     }
 
+    /*~~ write object file ~~*/
+    /* fprintf(objFPtr, "H%-6s%06X%06X\n", (imrPtr ? imrPtr->label : ""), STARTADR, PLENGTH); */
+
+    printf("output file : [%s], [%s]\n",lstFilename, objFilename);
     /* close files and free memory */
     free(lstFilename);
     free(objFilename);
@@ -788,7 +810,7 @@ int asmCreateObjectCode(unsigned int operAdr, IMRNODE* imrPtr, struct opcodeNode
                         tempInt2 = (int)operAdr - rB;
                         if(tempInt2 < 0 || tempInt2 > 4095){ // out of bounds for base relative
                             /* addressing mode needs to be format 4 but is not set to 4 */
-                            printf("Error on line %d: impossible to use pc- or base-relative addressing.\n", (imrPtr->linenumber)/5);
+                            printf("Error on line %d: impossible to use pc- or base-relative addressing.\n", (imrPtr->linenumber));
                             printf("\tNeed to use extended formatting mode.\n");
                             return 0;
                         }
@@ -799,7 +821,7 @@ int asmCreateObjectCode(unsigned int operAdr, IMRNODE* imrPtr, struct opcodeNode
                         }
                     }
                     else{
-                        printf("Error on line %d: impossible to use pc relative addressing and BASE is not set.\n", (imrPtr->linenumber)/5);
+                        printf("Error on line %d: impossible to use pc relative addressing and BASE is not set.\n", (imrPtr->linenumber));
                         return 0;
                     }
                 }
@@ -840,7 +862,6 @@ int asmCreateObjectCode(unsigned int operAdr, IMRNODE* imrPtr, struct opcodeNode
         objectcode += TA;
     }
     imrPtr->objectCode = objectcode;
-    /* printf("%s\tobjectcode: %06X\n", imrPtr->buffer, (unsigned int)imrPtr->objectCode); */
     return 1;
 }
 
