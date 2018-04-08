@@ -221,7 +221,7 @@ int readline(char* buffer, FILE* fp){
 
         if(!feof(fp)){
             // reached end of line
-            if(c == '\n'){
+            if(c == '\n' || c == '\0'){
                 buffer[i] = '\0';
                 return 1;
             }

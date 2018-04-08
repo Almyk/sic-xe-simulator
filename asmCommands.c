@@ -151,7 +151,7 @@ int asmSymTabInsert(char* label, int loc, int lineNum){
     strcpy(newSymbol->label, label);
     newSymbol->loc = loc;
     return 1;
-} // end of asmSecondPass
+}
 
 int asmAddIMRecord(int LOCCTR, int* imCount, char* label, char* opcode, char* operand, char* buffer, char flag){
     struct intermediateRecordNode* newRecord;
