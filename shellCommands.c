@@ -97,12 +97,12 @@ int funcType(char* filename){
 
     status = findFile(filename);
     if(status == 1){
-        printf("\n");
+        /* printf("\n"); */
         fp = fopen(filename, "r");
         while(readline(buffer, fp)){
-            printf("\t%s\n", buffer);
+            /* printf("\t%s\n", buffer); */
+            printf("%s\n", buffer);
         }
-        printf("\n");
         fclose(fp);
     }
     else{

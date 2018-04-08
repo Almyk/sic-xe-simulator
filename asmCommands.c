@@ -539,6 +539,7 @@ int asmSecondPass(char* filename){
     unsigned int trLength = 0; // length of text record
     unsigned char bytes[4];
     unsigned int split;
+    unsigned char temp;
     struct symbolNode* symbolPtr = NULL;
     unsigned int operAdr = 0;
     int notasymbol = 0;
@@ -713,7 +714,9 @@ int asmSecondPass(char* filename){
                 if(((trLength + trIndex) > TRMAXLEN) || (imrPtr->loc - trStart) > 0xff){ // initialize new text record row
                     /* write last information on current text record */
                     currentTR->record[trIndex] = '\0';
+                    temp = currentTR->record[9];
                     sprintf(currentTR->record+7, "%02X", (trIndex-8)/2);
+                    currentTR->record[9] = temp;
 
                     /* create new text record row */
                     newTR = TRALLOC();
@@ -752,7 +755,9 @@ int asmSecondPass(char* filename){
     } // while not END
     /* finish last text record */
     currentTR->record[trIndex] = '\0';
+    temp = currentTR->record[9];
     sprintf(currentTR->record+7, "%02X", (trIndex-8)/2);
+    currentTR->record[9] = temp;
     /* add end record */
     newTR = TRALLOC();
     sprintf(newTR->record, "%c%06X",'E', STARTADR);
@@ -766,8 +771,6 @@ int asmSecondPass(char* filename){
      * filename.lst ; filename.obj
      * and copy name from filename but change extension
      */
-
-    /* need to move this to end of this function */
     len = strlen(filename);
     lstFilename = calloc(len+1, sizeof(char));
     objFilename = calloc(len+1, sizeof(char));
@@ -815,11 +818,11 @@ int asmSecondPass(char* filename){
     trPtr = TRHEAD.next;
     while(trPtr){
         /* fprintf(objFPtr, "%s", trPtr->record); */
-        for(i = 0; i < TRMAXLEN; i++){
+        for(i = 0; i < TRMAXLEN && trPtr->record[i] != '\0'; i++){
             fprintf(objFPtr, "%c", trPtr->record[i]);
         }
         trPtr = trPtr->next;
-        if(trPtr) fprintf(objFPtr, "\n");
+        fputc('\n', objFPtr);
     }
 
     printf("output file : [%s], [%s]\n",lstFilename, objFilename);
