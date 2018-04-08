@@ -12,7 +12,7 @@
 #define TOKENBUF 4
 #define MEGA 1048576 // 2^20
 #define HASHSIZE 20
-#define SYMHASHSIZE 47
+#define SYMHASHSIZE 41
 #define TOKLEN 30
 
 // Data Structures
@@ -41,7 +41,7 @@ struct symbolNode{
 typedef struct intermediateRecordNode{
     unsigned int linenumber;
     unsigned int loc;
-    unsigned int objectCode;
+    long long int objectCode;
     int isComment;
     char label[TOKLEN];
     char opcode[TOKLEN];
@@ -124,6 +124,6 @@ int asmCheckSymbol(char*, int);
 int asmParseLine(char*, char*, char*, char*);
 struct symbolNode* symSearch(char*, int);
 int asmIsRegister(struct symbolNode*);
-void asmCreateObjectCode(unsigned int, IMRNODE*, struct opcodeNode*, unsigned int);
+int asmCreateObjectCode(unsigned int, IMRNODE*, struct opcodeNode*, unsigned int);
 
 #endif

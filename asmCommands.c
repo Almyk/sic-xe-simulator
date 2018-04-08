@@ -118,6 +118,8 @@ int asmSymTabInsert(char* label, int loc, int lineNum){
 
     hash = hashcode(label, SYMHASHSIZE);
     if(SYMTAB[hash]){
+        printf("!!! HEJ !!! \n");
+        printf("%s\n", label);
         /* check for matching label
            if found, raise flag and error */
         symbolPtr = SYMTAB[hash];
@@ -129,7 +131,8 @@ int asmSymTabInsert(char* label, int loc, int lineNum){
                 printf("\tAborting the assemble.\n");
                 return -2;
             }
-            symbolPtr = symbolPtr->next;
+            if(symbolPtr->next) symbolPtr = symbolPtr->next;
+            else break;
         }
         /* if it reached here, we didn't find label
            i.e. add label to the end of list*/
@@ -137,6 +140,7 @@ int asmSymTabInsert(char* label, int loc, int lineNum){
         newSymbol->last = SYMTAB[hash]->last;
         newSymbol->next = NULL;
         SYMTAB[hash]->last = newSymbol;
+        symbolPtr->next = newSymbol;
     }
     else{
         /* empty entry in Symbol Table
@@ -509,6 +513,16 @@ int asmFirstPass(char* filename){
 
     int k = 0;
     for(;k < imCount; k++) printf("LOCCTR %05X: %s\t%s\t%s\n", intermediateRecord[k]->loc, intermediateRecord[k]->label, intermediateRecord[k]->opcode, intermediateRecord[k]->operand);
+    k = 0;
+    struct symbolNode* ja;
+    for(;k < SYMHASHSIZE; k++){
+        ja = SYMTAB[k];
+        while(ja){
+            printf("%s %04X\t",ja->label, ja->loc);
+            ja = ja->next;
+            if(!ja) printf("\n");
+        }
+    }
 
     fclose(fp);
     return status;
@@ -694,10 +708,12 @@ int asmSecondPass(char* filename){
     return 1;
 }
 
-void asmCreateObjectCode(unsigned int operAdr, IMRNODE* imrPtr, struct opcodeNode* opcodePtr, unsigned int LOCCTR){
+int asmCreateObjectCode(unsigned int operAdr, IMRNODE* imrPtr, struct opcodeNode* opcodePtr, unsigned int LOCCTR){
     int format = opcodePtr->format[0]-'0';
-    unsigned int objectcode = 0;
-    unsigned int tempInt = 0;
+    long long int objectcode = 0;
+    int tempInt = 0;
+    int tempInt2 = 0;
+    int TA = operAdr;
 
     if(format == 1){
         objectcode = (unsigned int)opcodePtr->hex;
@@ -708,11 +724,40 @@ void asmCreateObjectCode(unsigned int operAdr, IMRNODE* imrPtr, struct opcodeNod
         objectcode += operAdr;
     }
     else if(format == 3){
-        /* go here */
-        /* calculate the Target Address */
+
+        if(imrPtr->e == 0){ // if format 3
+            /* calculate the Target Address, i.e. use pc or base relative */
+            /* go here */
+            tempInt = (int)operAdr - LOCCTR; // pc relative
+            if(tempInt < -2048 || tempInt > 2047){ // out of bounds for pc relative
+                if(!NOBASE){ // possible to do base relative address
+                    tempInt2 = (int)operAdr - rB;
+                    if(tempInt2 < 0 || tempInt2 > 4095){ // out of bounds for base relative
+                        /* addressing mode needs to be format 4 but is not set to 4 */
+                        printf("Error on line %d: impossible to use pc- or base-relative addressing.\n", (imrPtr->linenumber)/5);
+                        printf("\tNeed to use extended formatting mode.\n");
+                        return 0;
+                    }
+                    else{
+                        imrPtr->b = 1;
+                        imrPtr->p = 0;
+                        TA = tempInt2;
+                    }
+                }
+                else{
+                    printf("Error on line %d: impossible to use pc relative addressing and BASE is not set.\n", (imrPtr->linenumber)/5);
+                    return 0;
+                }
+            }
+            else{
+                imrPtr->p = 1;
+                imrPtr->b = 0;
+                TA = tempInt;
+            }
+        }
 
         /* create the object code */
-        objectcode = (unsigned int)opcodePtr->hex;
+        objectcode = (int)opcodePtr->hex;
         tempInt = imrPtr->n;
         tempInt <<= 1;
         objectcode += tempInt;
@@ -731,9 +776,10 @@ void asmCreateObjectCode(unsigned int operAdr, IMRNODE* imrPtr, struct opcodeNod
         else{ // format 3
             objectcode <<= 12;
         }
-        objectcode += operAdr;
+        objectcode += TA;
     }
     imrPtr->objectCode = objectcode;
+    return 1;
 }
 
 struct symbolNode* symSearch(char *key, int hashcode){
