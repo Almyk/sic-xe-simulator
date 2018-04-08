@@ -21,6 +21,8 @@ int PLENGTH = 0; // length of program
 */
 int NOBASE = 1;
 
+/* Registers */
+unsigned int rB = 0;
 
 /* ---------------------------- */
 
@@ -35,7 +37,13 @@ int asmAssemble(char* filename){
             initializeASM(1);
             status = asmFirstPass(filename);
             if(status > 0){ // first pass was succesful
-                asmSecondPass(filename);
+                status = asmSecondPass(filename);
+                if(!status){ // an error occurred
+                    return 1;
+                }
+            }
+            else{ // first pass failed
+                /* go here */
             }
         }
         // incorrect extension
@@ -91,6 +99,15 @@ void initializeASM(int mode){
             calloc(10, sizeof(struct intermediateRecordNode*)); /*line too long*/
         /* initialize global variables related to program */
         imIndex = 10; STARTADR = 0; ENDADR = 0; imCount = 0; PLENGTH = 0;
+
+        /* insert registers to SYMTAB */
+        asmSymTabInsert("A", 0, 0);
+        asmSymTabInsert("X", 1, 0);
+        asmSymTabInsert("L", 2, 0);
+        asmSymTabInsert("B", 3, 0);
+        asmSymTabInsert("S", 4, 0);
+        asmSymTabInsert("T", 5, 0);
+        asmSymTabInsert("F", 6, 0);
     }
 }
 
@@ -157,7 +174,15 @@ int asmAddIMRecord(int LOCCTR, int* imCount, char* label, char* opcode, char* op
     strcpy(newRecord->buffer, buffer);
     newRecord->linenumber = *imCount;
     newRecord->loc = LOCCTR;
-    newRecord->flag = flag;
+    newRecord->n = 1;
+    newRecord->i = 1;
+    newRecord->x = 0;
+    newRecord->b = 0;
+    newRecord->p = 0;
+    newRecord->e = 0;
+    newRecord->flag = '\0';
+    if(flag == '+') newRecord->e = 1;
+    if(flag == 'c') newRecord->flag = 'c';
 
     return 1;
 }
@@ -177,7 +202,7 @@ int asmOperandLength(char* operand){
                 denominator = 2;
                 while(i < len-1) buffer[j++] = operand[i++];
                 if(hexToInt(buffer) >= 0){ // means that it is valid hexadecimal
-                    result = j; // length of copied buffed
+                    result = j; // length of copied buffer
                 }
                 else{ // something wrong with inputted hexadecimal
                     printf("Error: not a valid hexadecimal number.\n");
@@ -250,6 +275,7 @@ int asmCheckSymbol(char* input, int len){
     if(isSymbol && !result){
         /* go here */
         /* print error */
+        return -2;
     }
     /* if input is a symbol */
     else if(result){
@@ -416,10 +442,10 @@ int asmFirstPass(char* filename){
                 flag = '+';
                 i = 1;
             }
-            else if(opcode[0] == '@'){
-                flag = '@';
-                i = 1;
-            }
+            /* else if(opcode[0] == '@'){ */
+            /*     flag = '@'; */
+            /*     i = 1; */
+            /* } */
             opcodePtr = opSearch(opcode+i, hashcode(opcode+i, HASHSIZE));
             if(opcodePtr){
                 LOCCTR += (opcodePtr->format[0])-'0';
@@ -459,7 +485,7 @@ int asmFirstPass(char* filename){
         }
         /* write line to IM Record */
         /* use loc instead of LOCCTR when writing to IM record */
-        status = asmAddIMRecord(loc, &imCount, label, opcode, operand, buffer, flag);
+        status = asmAddIMRecord(loc, &imCount, label, opcode+i, operand, buffer, flag);
         loc = LOCCTR;
         flag = '\0';
 
@@ -489,7 +515,11 @@ int asmFirstPass(char* filename){
 } // end of asmFirstPass
 
 int asmSecondPass(char* filename){
+    int status = 1;
     char* operand;
+    char tmpOperand[TOKLEN];
+    char *op1, *op2;
+    int op1Len, op2Len;
     struct opcodeNode* opcodePtr;
     FILE *lstFPtr;
     FILE *objFPtr;
@@ -497,13 +527,16 @@ int asmSecondPass(char* filename){
     char* objFilename;
     int len;
     int index = 0;
+    int prefix = 0; // used as index offset in case of a @, # prefix
     struct intermediateRecordNode* imrPtr = NULL;
     struct textRecordNode* trPtr = NULL;
-    int trIndex = 0; // text record index
-    unsigned int trStart = NULL; // to keep track of where text record start
-    unsigned int trLength = 0; // length of text record
     struct textRecordNode* currentTR = NULL;
     struct textRecordNode* newTR = NULL;
+    int trIndex = 0; // text record index
+    unsigned int trStart = 0; // to keep track of where text record start
+    unsigned int trLength = 0; // length of text record
+    struct symbolNode* symbolPtr = NULL;
+    unsigned int operAdr = 0;
 
     /*
      * Allocate memory for the filenames:
@@ -552,7 +585,10 @@ int asmSecondPass(char* filename){
 
     /* main loop of the Second Pass algorithm */
     while(strcmp(intermediateRecord[index]->opcode, "END")){
+        /* go here */
+        // setting trIndex to 1 every iteration surely must be wrong??
         trIndex = 1; // initialize text record index
+        prefix = 0;
         imrPtr = intermediateRecord[index];
         /* if not a comment */
         if(imrPtr->label[0] != '.' && imrPtr->flag != 'c'){
@@ -560,19 +596,172 @@ int asmSecondPass(char* filename){
             opcodePtr = opSearch(imrPtr->opcode, hashcode(imrPtr->opcode, HASHSIZE));
             /* if the opcode is found */
             if(opcodePtr){
+                /* make a copy of the operand so we can use strtok() on the string */
                 operand = imrPtr->operand;
-                /* if there is a symbol in OPERAND field */
-                if(asmIsSymbol(operand)){
-                    /* go here */
+                strcpy(tmpOperand, operand);
+                if(removeCommas(tmpOperand) < 0){
+                    /* print error */
+                    printf("Error on line %d: Too many commas in operand.\n", index+1);
+                    return 0;
                 }
-            }
+                /* tokenize the operand */
+                op1 = strtok(tmpOperand, " ");
+                op1Len = strlen(op1);
+                op2 = strtok(NULL, " ");
+                /* if there is a symbol in OPERAND field */
+                if((status = asmCheckSymbol(op1, op1Len)) > 0){ // verify symbol validity
+                    if(status == 2){ // indirect addressing
+                        /* imrPtr->flag = '@'; */
+                        imrPtr->n = 1;
+                        imrPtr->i = 0;
+                        prefix = 1;
+                    }
+                    else if(status == 3){ // immediate addressing
+                        /* imrPtr->flag = '#'; */
+                        imrPtr->n = 0;
+                        imrPtr->i = 1;
+                        prefix = 1;
+                    }
+                    /* find symbol in symbol table */
+                    symbolPtr = symSearch(op1+prefix, hashcode(op1+prefix, SYMHASHSIZE));
+                    if(symbolPtr){
+                        /* store symbol value as operand address */
+                        operAdr = symbolPtr->loc;
+                        if(opcodePtr->format[0] == '3' && op2){ // if there is an index offset(indexed addressing)
+                            if((op2Len = strlen(op2)) == 1){
+                                if(op2[0] == 'X'){
+                                    imrPtr->x = 1;
+                                }
+                                else{
+                                    printf("Error on line %d: incorrect register used for indexed addressing.\n", index+1);
+                                    return 0;
+                                }
+                            }
+                            else{
+                                printf("Error on line %d: incorrect syntax for indexed addressing.\n", index+1);
+                                return 0;
+                            }
+                        }
+                        else if(opcodePtr->format[0] == '2'){ // register to register
+                            if(!asmIsRegister(symbolPtr)){ // not a register
+                                printf("Error on line %d: symbol is not a register.\n", index+1);
+                                return 0;
+                            }
+                            operAdr <<= 4;
+                            symbolPtr = symSearch(op2, hashcode(op2, SYMHASHSIZE));
+                            if(symbolPtr && asmIsRegister(symbolPtr)){
+                                operAdr += symbolPtr->loc;
+                            }
+                            else{ // second symbol in operand is not a register
+                                printf("Error on line %d: second symbol in operand is not a register.\n", index+1);
+                                return 0;
+                            }
+                        }
+                    }
+                    else{
+                        /* undefined symbol */
+                        /* print error message */
+                        printf("Error on line %d: undefined symbol used as operand.\n", index+1);
+                        printf("Operand: %s\n", imrPtr->operand+prefix);
+                        return 0;
+                    }
+                } // if symbol found
+                else if(status < 0){ // there was an error in syntax
+                    /* print error message */
+                    printf("Error on line %d: something wrong with the operand.\n", index+1);
+                    printf("Operand: %s\n", imrPtr->operand+prefix);
+                    return 0;
+                }
+                /* not a symbol */
+                else{
+                    /* store 0 as operand address */
+                    operAdr = 0;
+                }
+                /* assemble the object code instruction */
+                /* go here */
+                asmCreateObjectCode(operAdr, imrPtr, opcodePtr, intermediateRecord[index+1]->loc);
+            } // end of if OPCODE found
+            /* go here */
+            /* need to add more exceptions for assembler-directives */
+            else if(!strcmp(imrPtr->opcode, "BASE")) NOBASE = 0;
+            else if(!strcmp(imrPtr->opcode, "NOBASE")) NOBASE = 1;
         }
-    }
+        index++;
+    } // while not END
     /***** WRITE TO FILE *****/
     fclose(lstFPtr);
     fclose(objFPtr);
     return 1;
 }
 
-void asmCreateObjectCode(void){
+void asmCreateObjectCode(unsigned int operAdr, IMRNODE* imrPtr, struct opcodeNode* opcodePtr, unsigned int LOCCTR){
+    int format = opcodePtr->format[0]-'0';
+    unsigned int objectcode = 0;
+    unsigned int tempInt = 0;
+
+    if(format == 1){
+        objectcode = (unsigned int)opcodePtr->hex;
+    }
+    else if(format == 2){
+        objectcode = (unsigned int)opcodePtr->hex;
+        objectcode <<= 8;
+        objectcode += operAdr;
+    }
+    else if(format == 3){
+        /* go here */
+        /* calculate the Target Address */
+
+        /* create the object code */
+        objectcode = (unsigned int)opcodePtr->hex;
+        tempInt = imrPtr->n;
+        tempInt <<= 1;
+        objectcode += tempInt;
+        objectcode += imrPtr->i;
+        objectcode <<= 1;
+        objectcode += imrPtr->x;
+        objectcode <<= 1;
+        objectcode += imrPtr->b;
+        objectcode <<= 1;
+        objectcode += imrPtr->p;
+        objectcode <<= 1;
+        objectcode += imrPtr->e;
+        if(imrPtr->e == 1){ // format 4
+            objectcode <<= 20;
+        }
+        else{ // format 3
+            objectcode <<= 12;
+        }
+        objectcode += operAdr;
+    }
+    imrPtr->objectCode = objectcode;
+}
+
+struct symbolNode* symSearch(char *key, int hashcode){
+    struct symbolNode* ptr = SYMTAB[hashcode];
+
+    while(ptr){
+        if(!(strcmp(ptr->label, key))){
+            return ptr;
+        }
+        if(!(ptr = ptr->next)) break;
+    }
+    return NULL;
+}
+
+int asmIsRegister(struct symbolNode* symbolPtr){
+    int result = 0;
+    int len = strlen(symbolPtr->label);
+    if(len == 1){
+        switch(symbolPtr->label[0]){
+        case 'A':
+        case 'X':
+        case 'L':
+        case 'B':
+        case 'S':
+        case 'T':
+        case 'F': result = 1; break;
+        }
+    }
+
+    return result;
 }

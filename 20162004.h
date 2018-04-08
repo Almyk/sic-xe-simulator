@@ -38,7 +38,7 @@ struct symbolNode{
     struct symbolNode* last;
 };
 
-struct intermediateRecordNode{
+typedef struct intermediateRecordNode{
     unsigned int linenumber;
     unsigned int loc;
     unsigned int objectCode;
@@ -48,7 +48,8 @@ struct intermediateRecordNode{
     char operand[TOKLEN];
     char buffer[MAXBUF];
     char flag;
-};
+    int n, i, x, b, p, e;
+} IMRNODE;
 
 struct textRecordNode{
     char record[70];
@@ -119,6 +120,10 @@ int asmSymTabInsert(char*, int, int);
 int asmAddIMRecord(const int, int*, char*, char*, char*, char*, char);
 int asmOperandLength(char*);
 int asmIsSymbol(char*);
+int asmCheckSymbol(char*, int);
 int asmParseLine(char*, char*, char*, char*);
+struct symbolNode* symSearch(char*, int);
+int asmIsRegister(struct symbolNode*);
+void asmCreateObjectCode(unsigned int, IMRNODE*, struct opcodeNode*, unsigned int);
 
 #endif
