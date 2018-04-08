@@ -331,3 +331,18 @@ int getToken(const char* buffer, char* token, int tokIndex, int* bufIndex){
 struct textRecordNode* TRALLOC(void){
     return (struct textRecordNode*) malloc(sizeof(struct textRecordNode));
 }
+
+int isNumber(char* string){
+    int i;
+    int result = 0;
+    for(i = 0; string[i] != '\0'; i++){
+        if(string[i] >= '0' && string[i] <= '9'){
+            result += string[i]-'0';
+        }
+        else{
+            result = -1;
+            break;
+        }
+    }
+    return result;
+}

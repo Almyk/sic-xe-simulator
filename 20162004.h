@@ -89,6 +89,7 @@ int stringToInt(char*);
 int skipSpaces(const char*, int*);
 int getToken(const char*, char*, int, int*);
 struct textRecordNode* TRALLOC(void);
+int isNumber(char*);
 
 
 // Functions regarding memory

@@ -259,6 +259,7 @@ int asmCheckSymbol(char* input, int len){
         /* if input contains a number */
         if(input[i] >= '0' && input[i] <= '9'){
             result = 0;
+            return 0;
         }
         /* if not a letter */
         else if(!(input[i] >= 'A' && input[i] <= 'Z')){
@@ -277,7 +278,6 @@ int asmCheckSymbol(char* input, int len){
     }
     /* if input should have been a symbol but format is wrong */
     if(isSymbol && !result){
-        /* go here */
         /* print error */
         return -2;
     }
@@ -296,7 +296,7 @@ int asmCheckSymbol(char* input, int len){
             }
         }
         /* if it is a register */
-        if(!result) return 0;
+        if(!result) return 1;
     }
     if(prefix == 1) return 2;
     if(prefix == 2) return 3;
@@ -604,26 +604,31 @@ int asmSecondPass(char* filename){
         trIndex = 1; // initialize text record index
         prefix = 0;
         imrPtr = intermediateRecord[index];
+        /* printf("(%d) BARNKALAS\n",(index+1)*5); */
+        /* printf("(%d)status : %d\n", (index+1)*5, status); */
+        /* printf("Buf: %s\n", imrPtr->buffer); */
         /* if not a comment */
-        if(imrPtr->label[0] != '.' && imrPtr->flag != 'c'){
+        if(imrPtr->flag != 'c'){
             /* search OPTAB for OPCODE */
             opcodePtr = opSearch(imrPtr->opcode, hashcode(imrPtr->opcode, HASHSIZE));
             /* if the opcode is found */
             if(opcodePtr){
                 /* make a copy of the operand so we can use strtok() on the string */
                 operand = imrPtr->operand;
-                strcpy(tmpOperand, operand);
-                if(removeCommas(tmpOperand) < 0){
-                    /* print error */
-                    printf("Error on line %d: Too many commas in operand.\n", index+1);
-                    return 0;
+                if((op1Len = strlen(operand)) > 0){ // not empty string
+                    strcpy(tmpOperand, operand);
+                    if(removeCommas(tmpOperand) < 0){
+                        /* print error */
+                        printf("Error on line %d: Too many commas in operand.\n", index+1);
+                        return 0;
+                    }
+                    /* tokenize the operand */
+                    op1 = strtok(tmpOperand, " ");
+                    op1Len = strlen(op1);
+                    op2 = strtok(NULL, " ");
                 }
-                /* tokenize the operand */
-                op1 = strtok(tmpOperand, " ");
-                op1Len = strlen(op1);
-                op2 = strtok(NULL, " ");
                 /* if there is a symbol in OPERAND field */
-                if((status = asmCheckSymbol(op1, op1Len)) > 0){ // verify symbol validity
+                if((op1Len && (status = asmCheckSymbol(op1, op1Len))) > 0){ // verify symbol validity
                     if(status == 2){ // indirect addressing
                         /* imrPtr->flag = '@'; */
                         imrPtr->n = 1;
@@ -641,6 +646,7 @@ int asmSecondPass(char* filename){
                     if(symbolPtr){
                         /* store symbol value as operand address */
                         operAdr = symbolPtr->loc;
+                        printf("(%d) HEJHOPP!!!\n", (index+1)*5);
                         if(opcodePtr->format[0] == '3' && op2){ // if there is an index offset(indexed addressing)
                             if((op2Len = strlen(op2)) == 1){
                                 if(op2[0] == 'X'){
@@ -662,13 +668,15 @@ int asmSecondPass(char* filename){
                                 return 0;
                             }
                             operAdr <<= 4;
-                            symbolPtr = symSearch(op2, hashcode(op2, SYMHASHSIZE));
-                            if(symbolPtr && asmIsRegister(symbolPtr)){
-                                operAdr += symbolPtr->loc;
-                            }
-                            else{ // second symbol in operand is not a register
-                                printf("Error on line %d: second symbol in operand is not a register.\n", index+1);
-                                return 0;
+                            if(op2){
+                                symbolPtr = symSearch(op2, hashcode(op2, SYMHASHSIZE));
+                                if(symbolPtr && asmIsRegister(symbolPtr)){
+                                    operAdr += symbolPtr->loc;
+                                }
+                                else{ // second symbol in operand is not a register
+                                    printf("Error on line %d: second symbol in operand is not a register.\n", index+1);
+                                    return 0;
+                                }
                             }
                         }
                     }
@@ -680,6 +688,23 @@ int asmSecondPass(char* filename){
                         return 0;
                     }
                 } // if symbol found
+                else if(!status){ // a number in operand
+                    if(imrPtr->operand[0] == '#'){ // immediate addressing
+                        imrPtr->n = 0;
+                        imrPtr->i = 1;
+                        prefix = 1;
+                    }
+                    status = isNumber((imrPtr->operand)+prefix);
+                    if(status >= 0){ // it is a number
+                        operAdr = status;
+                    }
+                    else{ // not a number
+                        /* print error message */
+                        printf("Error on line %d: something wrong with the operand.\n", index+1);
+                        printf("Operand: %s\n", imrPtr->operand+prefix);
+                        return 0;
+                    }
+                }
                 else if(status < 0){ // there was an error in syntax
                     /* print error message */
                     printf("Error on line %d: something wrong with the operand.\n", index+1);
@@ -697,7 +722,16 @@ int asmSecondPass(char* filename){
             } // end of if OPCODE found
             /* go here */
             /* need to add more exceptions for assembler-directives */
-            else if(!strcmp(imrPtr->opcode, "BASE")) NOBASE = 0;
+            else if(!strcmp(imrPtr->opcode, "BASE")){
+                NOBASE = 0;
+                symbolPtr = symSearch(imrPtr->operand, hashcode(imrPtr->operand, SYMHASHSIZE));
+                if(!symbolPtr){
+                    /* error finding symbol */
+                    printf("Error on line %d: missing operand.\n", index+1);
+                    return 0;
+                }
+                rB = symbolPtr->loc;
+            }
             else if(!strcmp(imrPtr->opcode, "NOBASE")) NOBASE = 1;
         }
         index++;
@@ -727,7 +761,6 @@ int asmCreateObjectCode(unsigned int operAdr, IMRNODE* imrPtr, struct opcodeNode
 
         if(imrPtr->e == 0){ // if format 3
             /* calculate the Target Address, i.e. use pc or base relative */
-            /* go here */
             tempInt = (int)operAdr - LOCCTR; // pc relative
             if(tempInt < -2048 || tempInt > 2047){ // out of bounds for pc relative
                 if(!NOBASE){ // possible to do base relative address
