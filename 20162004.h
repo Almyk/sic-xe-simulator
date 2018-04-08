@@ -7,13 +7,14 @@
 #include <string.h>
 #include <sys/stat.h>
 
-// Constansts
+// Constants
 #define MAXBUF 100
 #define TOKENBUF 4
 #define MEGA 1048576 // 2^20
 #define HASHSIZE 20
 #define SYMHASHSIZE 41
 #define TOKLEN 30
+#define TRMAXLEN 70
 
 // Data Structures
 struct historyNode{
@@ -52,7 +53,7 @@ typedef struct intermediateRecordNode{
 } IMRNODE;
 
 struct textRecordNode{
-    char record[70];
+    char record[TRMAXLEN];
     struct textRecordNode* next;
 };
 

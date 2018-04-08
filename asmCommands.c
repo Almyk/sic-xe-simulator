@@ -493,7 +493,8 @@ int asmFirstPass(char* filename){
         flag = '\0';
 
         /* read new line */
-        readline(buffer, fp);
+        status = readline(buffer, fp);
+        if(!status) break;
         status = asmParseLine(buffer, label, opcode, operand);
         if(status == 0){
             printf("Error on line %d: There is something wrong with the assembly syntax.\n", imCount);
@@ -509,19 +510,6 @@ int asmFirstPass(char* filename){
     /* store end address and program length in the global variables */
     ENDADR = LOCCTR;
     PLENGTH = LOCCTR - STARTADR;
-
-    /* int k = 0; */
-    /* for(;k < imCount; k++) printf("LOCCTR %05X: %s\t%s\t%s\n", intermediateRecord[k]->loc, intermediateRecord[k]->label, intermediateRecord[k]->opcode, intermediateRecord[k]->operand); */
-    /* k = 0; */
-    /* struct symbolNode* ja; */
-    /* for(;k < SYMHASHSIZE; k++){ */
-    /*     ja = SYMTAB[k]; */
-    /*     while(ja){ */
-    /*         printf("%s %04X\t",ja->label, ja->loc); */
-    /*         ja = ja->next; */
-    /*         if(!ja) printf("\n"); */
-    /*     } */
-    /* } */
 
     fclose(fp);
     return status;
@@ -549,6 +537,8 @@ int asmSecondPass(char* filename){
     int trIndex = 0; // text record index
     unsigned int trStart = 0; // to keep track of where text record start
     unsigned int trLength = 0; // length of text record
+    unsigned char bytes[4];
+    unsigned int split;
     struct symbolNode* symbolPtr = NULL;
     unsigned int operAdr = 0;
     int notasymbol = 0;
@@ -572,10 +562,12 @@ int asmSecondPass(char* filename){
     TRHEAD.next = newTR;
     newTR->record[0] = 'T';
     currentTR = newTR;
-    trIndex = 1; // initialize text record index
+    trIndex = 9; // initialize text record index
+    trStart = STARTADR;
+    sprintf(currentTR->record+1, "%06X", trStart);
 
     /* main loop of the Second Pass algorithm */
-    while(strcmp(intermediateRecord[index]->opcode, "END")){
+    while(strcmp(intermediateRecord[index]->opcode, "END") && index < imCount-1){
         /* go here */
         prefix = 0;
         imrPtr = intermediateRecord[index];
@@ -712,15 +704,45 @@ int asmSecondPass(char* filename){
             else if(!strcmp(imrPtr->opcode, "BYTE")){
                 asmByteObjectCodeCreator(imrPtr);
             }
-            /* go here */
             /* store objectcode into text record */
             if(imrPtr->objectCode){
+                /* go here */
+                /* need to make this into its own function */
                 trLength = intermediateRecord[index+1]->loc - imrPtr->loc;
-                if((trLength + trIndex) > 70){
+                trLength *= 2; // for every byte there are 2 characters
+                if(((trLength + trIndex) > TRMAXLEN) || (imrPtr->loc - trStart) > 0xff){ // initialize new text record row
+                    /* write last information on current text record */
+                    currentTR->record[trIndex] = '\0';
+                    sprintf(currentTR->record+7, "%02X", (trIndex-8)/2);
+
+                    /* create new text record row */
+                    newTR = TRALLOC();
+                    newTR->record[0] = 'T';
+                    currentTR->next = newTR;
+                    currentTR = newTR;
+                    trStart = imrPtr->loc;
+                    /* write start address (loc) */
+                    sprintf(currentTR->record+1, "%06X", trStart);
+                    trIndex = 9;
+                }
+                /* find values of individual bytes */
+                split = imrPtr->objectCode;
+                bytes[0] = (split >> 24) & 0xff;
+                bytes[1] = (split >> 16) & 0xff;
+                bytes[2] = (split >> 8) & 0xff;
+                bytes[3] = split & 0xff;
+                int ok = 0;
+                /* write text record one byte at a time */
+                for(i = 0; i < 4; i++){
+                    if(bytes[i] || ok){
+                        ok = 1;
+                        sprintf((currentTR->record)+trIndex, "%02X", bytes[i]);
+                        trIndex += 2;
+                    }
                 }
 
-
-                trIndex += trLength;
+                /* sprintf((currentTR->record)+trIndex, "%0X", (unsigned int)imrPtr->objectCode); */
+                /* trIndex += trLength; */
             }
 
             //printf("Objectcode: %02X\n", (unsigned int)imrPtr->objectCode);
@@ -728,6 +750,16 @@ int asmSecondPass(char* filename){
         } // (if not a comment)
         index++;
     } // while not END
+    /* finish last text record */
+    currentTR->record[trIndex] = '\0';
+    sprintf(currentTR->record+7, "%02X", (trIndex-8)/2);
+    /* add end record */
+    newTR = TRALLOC();
+    sprintf(newTR->record, "%c%06X",'E', STARTADR);
+    currentTR->next = newTR;
+    newTR->next = NULL;
+
+
     /***** WRITE TO FILE *****/
     /*
      * Allocate memory for the filenames:
@@ -748,7 +780,7 @@ int asmSecondPass(char* filename){
     lstFPtr = fopen(lstFilename, "w");
     objFPtr = fopen(objFilename, "w");
 
-    /*~~ write listing line ~~*/
+    /*~~ write to listing file ~~*/
     for(i = 0; i < imCount; i++){
         imrPtr = intermediateRecord[i];
         if(i == imCount - 1){
@@ -773,12 +805,33 @@ int asmSecondPass(char* filename){
     }
 
     /*~~ write object file ~~*/
-    /* fprintf(objFPtr, "H%-6s%06X%06X\n", (imrPtr ? imrPtr->label : ""), STARTADR, PLENGTH); */
+    imrPtr = intermediateRecord[0];
+    if(!(strcmp(imrPtr->opcode, "START"))){
+        fprintf(objFPtr, "H%-6s%06X%06X\n", (imrPtr ? imrPtr->label : ""), STARTADR, PLENGTH);
+    }
+    else{
+        fprintf(objFPtr, "H%-6s%06X%06X\n", "", STARTADR, PLENGTH);
+    }
+    trPtr = TRHEAD.next;
+    while(trPtr){
+        /* fprintf(objFPtr, "%s", trPtr->record); */
+        for(i = 0; i < TRMAXLEN; i++){
+            fprintf(objFPtr, "%c", trPtr->record[i]);
+        }
+        trPtr = trPtr->next;
+        if(trPtr) fprintf(objFPtr, "\n");
+    }
 
     printf("output file : [%s], [%s]\n",lstFilename, objFilename);
     /* close files and free memory */
     free(lstFilename);
     free(objFilename);
+    trPtr = TRHEAD.next;
+    while(trPtr){
+        currentTR = trPtr;
+        trPtr = trPtr->next;
+        free(currentTR);
+    }
     fclose(lstFPtr);
     fclose(objFPtr);
     return 1;
