@@ -334,10 +334,10 @@ struct textRecordNode* TRALLOC(void){
 
 int isNumber(char* string){
     int i;
-    int result = 0;
+    int result = 1;
     for(i = 0; string[i] != '\0'; i++){
         if(string[i] >= '0' && string[i] <= '9'){
-            result += string[i]-'0';
+            ;
         }
         else{
             result = -1;

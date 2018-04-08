@@ -646,7 +646,6 @@ int asmSecondPass(char* filename){
                     if(symbolPtr){
                         /* store symbol value as operand address */
                         operAdr = symbolPtr->loc;
-                        printf("(%d) HEJHOPP!!!\n", (index+1)*5);
                         if(opcodePtr->format[0] == '3' && op2){ // if there is an index offset(indexed addressing)
                             if((op2Len = strlen(op2)) == 1){
                                 if(op2[0] == 'X'){
@@ -696,7 +695,7 @@ int asmSecondPass(char* filename){
                     }
                     status = isNumber((imrPtr->operand)+prefix);
                     if(status >= 0){ // it is a number
-                        operAdr = status;
+                        operAdr = stringToInt((imrPtr->operand)+prefix);
                     }
                     else{ // not a number
                         /* print error message */
@@ -759,33 +758,35 @@ int asmCreateObjectCode(unsigned int operAdr, IMRNODE* imrPtr, struct opcodeNode
     }
     else if(format == 3){
 
-        if(imrPtr->e == 0){ // if format 3
-            /* calculate the Target Address, i.e. use pc or base relative */
-            tempInt = (int)operAdr - LOCCTR; // pc relative
-            if(tempInt < -2048 || tempInt > 2047){ // out of bounds for pc relative
-                if(!NOBASE){ // possible to do base relative address
-                    tempInt2 = (int)operAdr - rB;
-                    if(tempInt2 < 0 || tempInt2 > 4095){ // out of bounds for base relative
-                        /* addressing mode needs to be format 4 but is not set to 4 */
-                        printf("Error on line %d: impossible to use pc- or base-relative addressing.\n", (imrPtr->linenumber)/5);
-                        printf("\tNeed to use extended formatting mode.\n");
-                        return 0;
+        if(!(imrPtr->n == 0 && imrPtr->i == 1)){
+            if(imrPtr->e == 0){ // if format 3
+                /* calculate the Target Address, i.e. use pc or base relative */
+                tempInt = (int)operAdr - LOCCTR; // pc relative
+                if(tempInt < -2048 || tempInt > 2047){ // out of bounds for pc relative
+                    if(!NOBASE){ // possible to do base relative address
+                        tempInt2 = (int)operAdr - rB;
+                        if(tempInt2 < 0 || tempInt2 > 4095){ // out of bounds for base relative
+                            /* addressing mode needs to be format 4 but is not set to 4 */
+                            printf("Error on line %d: impossible to use pc- or base-relative addressing.\n", (imrPtr->linenumber)/5);
+                            printf("\tNeed to use extended formatting mode.\n");
+                            return 0;
+                        }
+                        else{
+                            imrPtr->b = 1;
+                            imrPtr->p = 0;
+                            TA = tempInt2;
+                        }
                     }
                     else{
-                        imrPtr->b = 1;
-                        imrPtr->p = 0;
-                        TA = tempInt2;
+                        printf("Error on line %d: impossible to use pc relative addressing and BASE is not set.\n", (imrPtr->linenumber)/5);
+                        return 0;
                     }
                 }
                 else{
-                    printf("Error on line %d: impossible to use pc relative addressing and BASE is not set.\n", (imrPtr->linenumber)/5);
-                    return 0;
+                    imrPtr->p = 1;
+                    imrPtr->b = 0;
+                    TA = tempInt;
                 }
-            }
-            else{
-                imrPtr->p = 1;
-                imrPtr->b = 0;
-                TA = tempInt;
             }
         }
 
@@ -805,13 +806,20 @@ int asmCreateObjectCode(unsigned int operAdr, IMRNODE* imrPtr, struct opcodeNode
         objectcode += imrPtr->e;
         if(imrPtr->e == 1){ // format 4
             objectcode <<= 20;
+            /* clearing all but 20 bits */
+            TA |= 0xFFF00000;
+            TA ^= 0xFFF00000;
         }
         else{ // format 3
             objectcode <<= 12;
+            /* clearing all but 12 bits */
+            TA |= 0xFFFFF000;
+            TA ^= 0xFFFFF000;
         }
         objectcode += TA;
     }
     imrPtr->objectCode = objectcode;
+    printf("%s\tobjectcode: %06X\n", imrPtr->buffer, (unsigned int)imrPtr->objectCode);
     return 1;
 }
 
