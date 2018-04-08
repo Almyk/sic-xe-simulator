@@ -118,8 +118,6 @@ int asmSymTabInsert(char* label, int loc, int lineNum){
 
     hash = hashcode(label, SYMHASHSIZE);
     if(SYMTAB[hash]){
-        printf("!!! HEJ !!! \n");
-        printf("%s\n", label);
         /* check for matching label
            if found, raise flag and error */
         symbolPtr = SYMTAB[hash];
@@ -511,18 +509,18 @@ int asmFirstPass(char* filename){
     ENDADR = LOCCTR;
     PLENGTH = LOCCTR - STARTADR;
 
-    int k = 0;
-    for(;k < imCount; k++) printf("LOCCTR %05X: %s\t%s\t%s\n", intermediateRecord[k]->loc, intermediateRecord[k]->label, intermediateRecord[k]->opcode, intermediateRecord[k]->operand);
-    k = 0;
-    struct symbolNode* ja;
-    for(;k < SYMHASHSIZE; k++){
-        ja = SYMTAB[k];
-        while(ja){
-            printf("%s %04X\t",ja->label, ja->loc);
-            ja = ja->next;
-            if(!ja) printf("\n");
-        }
-    }
+    /* int k = 0; */
+    /* for(;k < imCount; k++) printf("LOCCTR %05X: %s\t%s\t%s\n", intermediateRecord[k]->loc, intermediateRecord[k]->label, intermediateRecord[k]->opcode, intermediateRecord[k]->operand); */
+    /* k = 0; */
+    /* struct symbolNode* ja; */
+    /* for(;k < SYMHASHSIZE; k++){ */
+    /*     ja = SYMTAB[k]; */
+    /*     while(ja){ */
+    /*         printf("%s %04X\t",ja->label, ja->loc); */
+    /*         ja = ja->next; */
+    /*         if(!ja) printf("\n"); */
+    /*     } */
+    /* } */
 
     fclose(fp);
     return status;
@@ -551,6 +549,7 @@ int asmSecondPass(char* filename){
     unsigned int trLength = 0; // length of text record
     struct symbolNode* symbolPtr = NULL;
     unsigned int operAdr = 0;
+    int notasymbol = 0;
 
     /*
      * Allocate memory for the filenames:
@@ -714,10 +713,12 @@ int asmSecondPass(char* filename){
                 else{
                     /* store 0 as operand address */
                     operAdr = 0;
+                    notasymbol = 1;
                 }
                 /* assemble the object code instruction */
                 /* go here */
-                asmCreateObjectCode(operAdr, imrPtr, opcodePtr, intermediateRecord[index+1]->loc);
+                asmCreateObjectCode(operAdr, imrPtr, opcodePtr, intermediateRecord[index+1]->loc, notasymbol);
+                notasymbol = 0; // reset notasymbol
             } // end of if OPCODE found
             /* go here */
             /* need to add more exceptions for assembler-directives */
@@ -732,6 +733,9 @@ int asmSecondPass(char* filename){
                 rB = symbolPtr->loc;
             }
             else if(!strcmp(imrPtr->opcode, "NOBASE")) NOBASE = 1;
+            else if(!strcmp(imrPtr->opcode, "BYTE")){
+                asmByteObjectCodeCreator(imrPtr);
+            }
         }
         index++;
     } // while not END
@@ -741,7 +745,7 @@ int asmSecondPass(char* filename){
     return 1;
 }
 
-int asmCreateObjectCode(unsigned int operAdr, IMRNODE* imrPtr, struct opcodeNode* opcodePtr, unsigned int LOCCTR){
+int asmCreateObjectCode(unsigned int operAdr, IMRNODE* imrPtr, struct opcodeNode* opcodePtr, unsigned int LOCCTR, int notasymbol){
     int format = opcodePtr->format[0]-'0';
     long long int objectcode = 0;
     int tempInt = 0;
@@ -758,7 +762,7 @@ int asmCreateObjectCode(unsigned int operAdr, IMRNODE* imrPtr, struct opcodeNode
     }
     else if(format == 3){
 
-        if(!(imrPtr->n == 0 && imrPtr->i == 1)){
+        if(!(imrPtr->n == 0 && imrPtr->i == 1) && !notasymbol){
             if(imrPtr->e == 0){ // if format 3
                 /* calculate the Target Address, i.e. use pc or base relative */
                 tempInt = (int)operAdr - LOCCTR; // pc relative
@@ -819,7 +823,7 @@ int asmCreateObjectCode(unsigned int operAdr, IMRNODE* imrPtr, struct opcodeNode
         objectcode += TA;
     }
     imrPtr->objectCode = objectcode;
-    printf("%s\tobjectcode: %06X\n", imrPtr->buffer, (unsigned int)imrPtr->objectCode);
+    /* printf("%s\tobjectcode: %06X\n", imrPtr->buffer, (unsigned int)imrPtr->objectCode); */
     return 1;
 }
 
@@ -851,4 +855,31 @@ int asmIsRegister(struct symbolNode* symbolPtr){
     }
 
     return result;
+}
+
+void asmByteObjectCodeCreator(struct intermediateRecordNode* imrPtr){
+    int i, j;
+    char buf[TOKLEN] = "";
+    int TA = 0;
+    if(imrPtr->operand[0] == 'X'){
+        j = 2;
+        for(i = 0; imrPtr->operand[j] != '\''; i++, j++){
+            buf[i] = imrPtr->operand[j];
+        }
+        buf[i] = '\0';
+        TA = hexToInt(buf);
+    }
+    else if(imrPtr->operand[0] == 'C'){
+        j = 2;
+        for(i = 0; imrPtr->operand[j] != '\''; i++, j++){
+            buf[i] = imrPtr->operand[j];
+        }
+        buf[i] = '\0';
+        for(j = 0; j < i; j++){
+            TA += buf[j];
+            if((j+1) < i) TA <<= 8;
+        }
+    }
+    imrPtr->objectCode = TA;
+    /* printf("%s\tobjectcode: %06X\n", imrPtr->buffer, (unsigned int)imrPtr->objectCode); */
 }

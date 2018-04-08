@@ -125,6 +125,7 @@ int asmCheckSymbol(char*, int);
 int asmParseLine(char*, char*, char*, char*);
 struct symbolNode* symSearch(char*, int);
 int asmIsRegister(struct symbolNode*);
-int asmCreateObjectCode(unsigned int, IMRNODE*, struct opcodeNode*, unsigned int);
+int asmCreateObjectCode(unsigned int, IMRNODE*, struct opcodeNode*, unsigned int, int);
+void asmByteObjectCodeCreator(struct intermediateRecordNode*);
 
 #endif
