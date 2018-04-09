@@ -4,10 +4,13 @@ void getInput(char* command){
     /* this function gets user input until newline is enter */
     char c;
     int i = 0;
+    int onlySpace = 1;
 
     while((c = getchar()) != '\n' && i < MAXBUF - 1){
-        command[i++] = c;
+        if(c != ' ') onlySpace = 0;
+        if(!onlySpace) command[i++] = c;
     }
+    if(onlySpace) command[0] = '\0';
     command[i] = '\0';
 
     // flushes stdin
