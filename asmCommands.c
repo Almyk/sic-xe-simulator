@@ -32,9 +32,9 @@ int asmAssemble(char* filename){
     status = findFile(filename);
     // file found
     if(status){
-        status = cmpExtension(filename, ".asm");
+        status = cmpExtension(filename, ".asm"); // confirms extension
         if(!status){
-            initializeASM(1);
+            initializeASM(1); // initializes variables and data structures
             status = asmFirstPass(filename);
             if(status > 0){ // first pass was succesful
                 status = asmSecondPass(filename);
@@ -73,7 +73,7 @@ void initializeASM(int mode){
     int i = 0;
     struct symbolNode* symPtr;
     struct symbolNode* symDelete;
-    if(imIndex){
+    if(imIndex){ // if there exist records in intermediate record
         while(i < imIndex && intermediateRecord[i]){
             /* printf("inter: %s\n", intermediateRecord[i]->opcode); */
             free(intermediateRecord[i]);
@@ -158,7 +158,7 @@ int asmSymTabInsert(char* label, int loc, int lineNum){
 int asmAddIMRecord(int LOCCTR, int* imCount, char* label, char* opcode, char* operand, char* buffer, char flag){
     struct intermediateRecordNode* newRecord;
 
-    /* need to add a check to see if imCount > imIndex */
+    /* if not enough indexes allocated to store new record */
     if(!((*imCount) < imIndex)){
         /* reallocates memory to extend the imRecord */
         imIndex *= 2;
@@ -170,6 +170,7 @@ int asmAddIMRecord(int LOCCTR, int* imCount, char* label, char* opcode, char* op
         printf("Error when allocating memory for a new IM Record.\n");
         return -2;
     }
+    /* initializes the values in the intermediate record */
     intermediateRecord[*imCount] = newRecord;
     (*imCount)++;
     strcpy(newRecord->label, label);
@@ -193,7 +194,7 @@ int asmAddIMRecord(int LOCCTR, int* imCount, char* label, char* opcode, char* op
 
 int asmOperandLength(char* operand){
     /* this function computes how many bytes are needed
-     * to be preserved for the label */
+     * to be reserved for the label */
     int result = 0;
     int denominator = 0;
     int i = 2, j = 0;
@@ -456,6 +457,8 @@ int asmFirstPass(char* filename){
                 LOCCTR += (opcodePtr->format[0])-'0';
                 if(flag == '+') LOCCTR += 1;
             }
+            /* if not in object code list,
+             compare the input with following assembler-directives*/
             else if(!(strcmp(opcode+i, "WORD"))){
                 LOCCTR += 3;
             }
@@ -730,12 +733,12 @@ int asmSecondPass(char* filename){
                     sprintf(currentTR->record+1, "%06X", trStart);
                     trIndex = 9;
                 }
-                /* find values of individual bytes */
+                /* find values of individual bytes by splitting them up */
                 split = imrPtr->objectCode;
-                bytes[0] = (split >> 24) & 0xff;
-                bytes[1] = (split >> 16) & 0xff;
-                bytes[2] = (split >> 8) & 0xff;
-                bytes[3] = split & 0xff;
+                bytes[0] = (split >> 24) & 0xff; // move x bytes to the right,
+                bytes[1] = (split >> 16) & 0xff; // use logical AND to,
+                bytes[2] = (split >> 8) & 0xff;  // only store the bits that,
+                bytes[3] = split & 0xff;         // we are interested in.
                 int ok = 0;
                 /* write text record one byte at a time */
                 for(i = 0; i < 4; i++){
@@ -843,7 +846,7 @@ int asmSecondPass(char* filename){
 }
 
 int asmCreateObjectCode(unsigned int operAdr, IMRNODE* imrPtr, struct opcodeNode* opcodePtr, unsigned int LOCCTR, int notasymbol){
-    int format = opcodePtr->format[0]-'0';
+    int format = opcodePtr->format[0]-'0'; // reads format
     long long int objectcode = 0;
     int tempInt = 0;
     int tempInt2 = 0;
@@ -854,12 +857,13 @@ int asmCreateObjectCode(unsigned int operAdr, IMRNODE* imrPtr, struct opcodeNode
     }
     else if(format == 2){
         objectcode = (unsigned int)opcodePtr->hex;
-        objectcode <<= 8;
+        objectcode <<= 8; // move value 1 byte to the left
         objectcode += operAdr;
     }
     else if(format == 3){
 
-        if(!(imrPtr->n == 0 && imrPtr->i == 1) && !notasymbol){
+        /* if it is not immediate addressing and it is a symbol*/
+        if(!(imrPtr->n == 0 && imrPtr->i == 1) && !notasymbol){ //!notasymbol is double negative, meaning it is a symbol
             if(imrPtr->e == 0){ // if format 3
                 /* calculate the Target Address, i.e. use pc or base relative */
                 tempInt = (int)operAdr - LOCCTR; // pc relative
@@ -926,6 +930,8 @@ int asmCreateObjectCode(unsigned int operAdr, IMRNODE* imrPtr, struct opcodeNode
 struct symbolNode* symSearch(char *key, int hashcode){
     struct symbolNode* ptr = SYMTAB[hashcode];
 
+    /* searches for a symbol in the hash table */
+    /* returns pointer if to symbol if found, else NULL */
     while(ptr){
         if(!(strcmp(ptr->label, key))){
             return ptr;
@@ -957,6 +963,8 @@ void asmByteObjectCodeCreator(struct intermediateRecordNode* imrPtr){
     int i, j;
     char buf[TOKLEN] = "";
     int TA = 0;
+
+    /* if hexadecimal */
     if(imrPtr->operand[0] == 'X'){
         j = 2;
         for(i = 0; imrPtr->operand[j] != '\''; i++, j++){
@@ -965,6 +973,7 @@ void asmByteObjectCodeCreator(struct intermediateRecordNode* imrPtr){
         buf[i] = '\0';
         TA = hexToInt(buf);
     }
+    /* if ascii */
     else if(imrPtr->operand[0] == 'C'){
         j = 2;
         for(i = 0; imrPtr->operand[j] != '\''; i++, j++){
@@ -973,7 +982,7 @@ void asmByteObjectCodeCreator(struct intermediateRecordNode* imrPtr){
         buf[i] = '\0';
         for(j = 0; j < i; j++){
             TA += buf[j];
-            if((j+1) < i) TA <<= 8;
+            if((j+1) < i) TA <<= 8; // if not last char, move 1 byte to left
         }
     }
     imrPtr->objectCode = TA;

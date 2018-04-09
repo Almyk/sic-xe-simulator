@@ -13,7 +13,7 @@
 #define MEGA 1048576 // 2^20
 #define HASHSIZE 20
 #define SYMHASHSIZE 41
-#define TOKLEN 30
+#define TOKLEN 31
 #define TRMAXLEN 70
 
 // Data Structures
