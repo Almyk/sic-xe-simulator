@@ -4,6 +4,7 @@
 unsigned char MEMORY[MEGA] = "";
 struct opcodeNode* HASHTABLE[HASHSIZE]; // Operation Code Table
 struct symbolNode* SYMTAB[SYMHASHSIZE]; // Symbol Table
+int SYMTABCOUNT = 0; // keeps count of entries added to SYMTAB
 
 int main(void){
     char command[MAXBUF] = ""; // input buffer
@@ -66,6 +67,7 @@ int runCommand(char **args, int n){
             }
             else if(!(strcmp(args[0], "opcodelist"))) status = opPrintOpcodelist();
             else if(!(strcmp(args[0], "reset"))) status = memReset();
+            else if(!(strcmp(args[0], "symbol"))) status = asmPrintSymTab();
             else status = -1;
         }
         // if no match

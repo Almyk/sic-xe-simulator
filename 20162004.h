@@ -66,6 +66,7 @@ extern unsigned char MEMORY[MEGA];
 // Hash tables
 extern struct opcodeNode* HASHTABLE[HASHSIZE]; // Operation Code Table
 extern struct symbolNode* SYMTAB[SYMHASHSIZE]; // Symbol Table
+extern int SYMTABCOUNT;
 
 
 /* Function Declerations */
@@ -128,5 +129,6 @@ struct symbolNode* symSearch(char*, int);
 int asmIsRegister(struct symbolNode*);
 int asmCreateObjectCode(unsigned int, IMRNODE*, struct opcodeNode*, unsigned int, int);
 void asmByteObjectCodeCreator(struct intermediateRecordNode*);
+int asmPrintSymTab(void);
 
 #endif

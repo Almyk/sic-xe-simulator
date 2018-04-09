@@ -92,6 +92,7 @@ void initializeASM(int mode){
                 }
             }
         }
+        SYMTABCOUNT = 0;
     }
     if(mode){
         /* allocate memory for ten intermediate records */
@@ -150,6 +151,7 @@ int asmSymTabInsert(char* label, int loc, int lineNum){
     }
     strcpy(newSymbol->label, label);
     newSymbol->loc = loc;
+    SYMTABCOUNT++;
     return 1;
 }
 
@@ -975,5 +977,48 @@ void asmByteObjectCodeCreator(struct intermediateRecordNode* imrPtr){
         }
     }
     imrPtr->objectCode = TA;
-    /* printf("%s\tobjectcode: %06X\n", imrPtr->buffer, (unsigned int)imrPtr->objectCode); */
+}
+
+int asmPrintSymTab(void){
+    int status = 1;
+    int i, j;
+    struct symbolNode* symPtr;
+    struct symbolNode **symList;
+    if(SYMTABCOUNT){
+        symList = (struct symbolNode**)malloc(sizeof(struct symbolNode*)*SYMTABCOUNT);
+    }
+    else{// In case of empty symbol table
+        printf("Nothing to print, symbol table is empty.\n");
+        return 1;
+    }
+    j = 0;
+    /* fill list of symbols */
+    for(i = 0; i < SYMHASHSIZE; i++){
+        symPtr = SYMTAB[i];
+        while(symPtr){
+            symList[j] = symPtr;
+            j++;
+            symPtr = symPtr->next;
+        }
+    }
+    /* sort list of symbols */
+    for(i = 1; i < SYMTABCOUNT; i++){ // insertion sort
+        symPtr = symList[i] ;
+        j = i - 1;
+        while(j >= 0 && (strcmp(symPtr->label, symList[j]->label)) > 0){
+            symList[j+1] = symList[j];
+            j--;
+        }
+        symList[j+1] = symPtr;
+    }
+
+    /* print list of symbols */
+    for(i = 0; i < SYMTABCOUNT; i++){
+        printf("\t%6s\t%04X\n", symList[i]->label, symList[i]->loc);
+    }
+
+    /* free memory */
+    free(symList);
+
+    return status;
 }
