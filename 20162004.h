@@ -131,4 +131,8 @@ int asmCreateObjectCode(unsigned int, IMRNODE*, struct opcodeNode*, unsigned int
 void asmByteObjectCodeCreator(struct intermediateRecordNode*);
 int asmPrintSymTab(void);
 
+// linker-loader functions
+int llSetProgaddr(char*);
+int llLoadProgram(char**, int);
+
 #endif

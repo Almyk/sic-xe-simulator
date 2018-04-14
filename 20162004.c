@@ -54,6 +54,12 @@ int runCommand(char **args, int n){
         else if(n == 2 && !(strcmp(args[0], "assemble"))){
             status = asmAssemble(args[1]);
         }
+        else if(n == 2 && !(strcmp(args[0], "progaddr"))){
+            status = llSetProgaddr(args[1]);
+        }
+        else if(n >= 2 && !(strcmp(args[0], "loader"))){
+            status = llLoadProgram(args, n);
+        }
         // commands that should only take 1 argument
         else if(args[1] == NULL){
             if(!(strcmp(args[0], "help")) || !(strcmp(args[0], "h"))) 

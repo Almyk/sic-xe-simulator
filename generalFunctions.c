@@ -176,6 +176,7 @@ void printError(int n){
     case -8: printf("Error: file is not a '.asm' file.\n"); break;
     }
 }
+
 void freeHistory(void){
     /* this function free's the memory allocated for history list */
     struct historyNode* head = getSetHistHead();
