@@ -13,6 +13,7 @@
 #define MEGA 1048576 // 2^20
 #define HASHSIZE 20
 #define SYMHASHSIZE 41
+#define ESHASHSIZE 31
 #define TOKLEN 31
 #define TRMAXLEN 70
 
@@ -51,6 +52,15 @@ typedef struct intermediateRecordNode{
     char flag;
     int n, i, x, b, p, e;
 } IMRNODE;
+
+struct esNode{
+    char SYMBOL[7];
+    char flag; // indicates whether control section or symbol
+    int address;
+    int length;
+    struct esNode* next;
+    struct esNode* last;
+};
 
 struct textRecordNode{
     char record[TRMAXLEN];
@@ -92,6 +102,7 @@ int skipSpaces(const char*, int*);
 int getToken(const char*, char*, int, int*);
 struct textRecordNode* TRALLOC(void);
 int isNumber(char*);
+int newHexToInt(char*, int);
 
 
 // Functions regarding memory
@@ -134,5 +145,8 @@ int asmPrintSymTab(void);
 // linker-loader functions
 int llSetProgaddr(char*);
 int llLoadProgram(char**, int);
+int llFirstPass(FILE*, int);
+struct esNode* esSearch(char*, int);
+void llExtSymTabInsert(char*, int, int, char);
 
 #endif

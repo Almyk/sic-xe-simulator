@@ -206,7 +206,7 @@ int asmOperandLength(char* operand){
             if(operand[0] == 'X'){ // if hexadecimal
                 denominator = 2;
                 while(i < len-1) buffer[j++] = operand[i++];
-                if(hexToInt(buffer) >= 0){ // means that it is valid hexadecimal
+                if(newHexToInt(buffer, j) >= 0){ // means that it is valid hexadecimal
                     result = j; // length of copied buffer
                 }
                 else{ // something wrong with inputted hexadecimal
@@ -931,7 +931,7 @@ struct symbolNode* symSearch(char *key, int hashcode){
     struct symbolNode* ptr = SYMTAB[hashcode];
 
     /* searches for a symbol in the hash table */
-    /* returns pointer if to symbol if found, else NULL */
+    /* returns pointer to symbol if found, else NULL */
     while(ptr){
         if(!(strcmp(ptr->label, key))){
             return ptr;
@@ -971,7 +971,7 @@ void asmByteObjectCodeCreator(struct intermediateRecordNode* imrPtr){
             buf[i] = imrPtr->operand[j];
         }
         buf[i] = '\0';
-        TA = hexToInt(buf);
+        TA = newHexToInt(buf, i);
     }
     /* if ascii */
     else if(imrPtr->operand[0] == 'C'){

@@ -64,7 +64,9 @@ char** parseInput(char* command, int* n){
 
     if(*n > 2 && commas != *n - 2){
         // not enough commas for amount of arguments
-        *n = -1;
+        if(strcmp(arguments[0], "loader")){ // and command is not loader
+            *n = -1;
+        }
     }
 
     return arguments;
@@ -224,7 +226,7 @@ int readline(char* buffer, FILE* fp){
         c = fgetc(fp);
 
         if(!feof(fp)){
-            // reached end of line
+            // if reached end of line
             if(c == '\n' || c == '\0'){
                 buffer[i] = '\0';
                 return 1;
@@ -236,7 +238,7 @@ int readline(char* buffer, FILE* fp){
         // reached end of file
         else return 0;
     }
-    return 0;
+    return -1;
 }
 
 struct historyNode* getSetHistHead(void){
@@ -348,5 +350,35 @@ int isNumber(char* string){
             break;
         }
     }
+    return result;
+}
+
+int newHexToInt(char* string, int n){
+    /* returns integer representation of a hexadecimal number
+     * given as a character string.
+     * this is a new version which can accept strings of any lengths.
+     */
+    int result = 0;
+    int i;
+
+    for(i = n-1; i >= 0; i--){
+        // 0 <= x <= 9
+        if(string[i] >= '0' && string[i] <= '9'){
+            result += (string[i] - '0') * power(16, n - i - 1);
+        }
+        // A <= x <= F
+        else if(string[i] >= 'A' && string[i] <= 'F'){
+            result += (string[i] - 'A' + 10) * power(16, n - i - 1);
+        }
+        // a <= x <= f
+        else if(string[i] >= 'a' && string[i] <= 'f'){
+            result += (string[i] - 'a' + 10) * power(16, n - i - 1);
+        }
+        // not a valid hexadecimal
+        else{
+            return -4;
+        }
+    }
+
     return result;
 }
