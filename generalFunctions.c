@@ -303,7 +303,7 @@ int skipSpaces(const char* buffer, int* index){
     /* this function increments index until it finds a non-space character */
     /* returns how many iterations it performed */
     int count = 0;
-    while(buffer[*index] == ' ' && buffer[*index] != '\0'){
+    while((buffer[*index] == ' ' || buffer[*index] == '\t') && buffer[*index] != '\0'){
         *index += 1;
         count++;
     }

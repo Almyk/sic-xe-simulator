@@ -434,6 +434,7 @@ int asmFirstPass(char* filename){
         LOCCTR = 0;
         STARTADR = 0;
     }
+    loc = LOCCTR;
     /* First Pass's Main loop */
     while(strcmp(opcode, "END")){
         i = 0;
@@ -750,6 +751,7 @@ int asmSecondPass(char* filename){
                 bytes[2] = (split >> 8) & 0xff;  // only store the bits that,
                 bytes[3] = split & 0xff;         // we are interested in.
                 int ok = 0;
+                if(!(strcmp(imrPtr->opcode, "WORD"))) ok = 1; // write full word
                 /* write text record one byte at a time */
                 for(i = 0; i < 4; i++){
                     if(bytes[i] || ok){
@@ -824,8 +826,14 @@ int asmSecondPass(char* filename){
         if(imrPtr->flag == 'c'){ // if it is a comment
             fprintf(lstFPtr, "%3d\t\t%s\n", imrPtr->linenumber, imrPtr->buffer);
         }
+        else if(!(strcmp(imrPtr->opcode, "WORD"))){
+            fprintf(lstFPtr, "%3d\t%04X\t%-6s\t%-6s\t%s\t\t%06X\n", imrPtr->linenumber, imrPtr->loc, imrPtr->label, imrPtr->opcode, imrPtr->operand, (unsigned int)imrPtr->objectCode);
+        }
         else if(imrPtr->x){ // if printed with indexed addressing
             fprintf(lstFPtr, "%3d\t%04X\t%-6s\t%-6s\t%s\t%02X\n", imrPtr->linenumber, imrPtr->loc, imrPtr->label, imrPtr->opcode, imrPtr->operand, (unsigned int)imrPtr->objectCode);
+        }
+        else if(!(strcmp(imrPtr->opcode, "START"))){
+            fprintf(lstFPtr, "%3d\t%04X\t%-6s\t%-6s\t%s\n", imrPtr->linenumber, imrPtr->loc, imrPtr->label, imrPtr->opcode, imrPtr->operand);
         }
         else if(imrPtr->objectCode == 0){ // no objectcode to print
             if(intermediateRecord[i+1]->loc - imrPtr->loc)
@@ -834,7 +842,10 @@ int asmSecondPass(char* filename){
                 fprintf(lstFPtr, "%3d\t\t%-6s\t%-6s\t%s\n", imrPtr->linenumber, imrPtr->label, imrPtr->opcode, imrPtr->operand);
         }
         else{ // normal print
-            fprintf(lstFPtr, "%3d\t%04X\t%-6s\t%-6s\t%s\t\t%02X\n", imrPtr->linenumber, imrPtr->loc, imrPtr->label, imrPtr->opcode, imrPtr->operand, (unsigned int)imrPtr->objectCode);
+            if(imrPtr->e)
+                fprintf(lstFPtr, "%3d\t%04X\t%-6s\t\b+%-6s\t%s\t\t%02X\n", imrPtr->linenumber, imrPtr->loc, imrPtr->label, imrPtr->opcode, imrPtr->operand, (unsigned int)imrPtr->objectCode);
+            else
+                fprintf(lstFPtr, "%3d\t%04X\t%-6s\t%-6s\t%s\t\t%02X\n", imrPtr->linenumber, imrPtr->loc, imrPtr->label, imrPtr->opcode, imrPtr->operand, (unsigned int)imrPtr->objectCode);
         }
     }
 
