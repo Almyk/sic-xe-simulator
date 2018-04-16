@@ -2,7 +2,8 @@
 
 /**** global variables ****/
 
-struct textRecordNode TRHEAD;
+struct textRecordNode TRHEAD; // text record head
+struct textRecordNode MRHEAD; // modification record head
 
 /* variables regarding the intermediate record */
 struct intermediateRecordNode** intermediateRecord;
@@ -548,6 +549,8 @@ int asmSecondPass(char* filename){
     struct symbolNode* symbolPtr = NULL;
     unsigned int operAdr = 0;
     int notasymbol = 0;
+    struct textRecordNode* mrPtr = NULL;
+    struct textRecordNode* currentMR = NULL;
 
 
     /* read first input line */
@@ -749,6 +752,22 @@ int asmSecondPass(char* filename){
                     }
                 }
 
+                /* if extended mode we need to create a modification record. */
+                if(imrPtr->e == 1 && imrPtr->n == 1 && imrPtr->i == 1){
+                    mrPtr = TRALLOC();
+                    mrPtr->record[0] = 'M';
+                    sprintf((mrPtr->record)+1, "%06X", (imrPtr->loc)+1);
+                    sprintf((mrPtr->record)+7, "%02X", 0x05);
+                    mrPtr->next = NULL;
+                    if(MRHEAD.next){ // not first modification record entry
+                        currentMR->next = mrPtr;
+                    }
+                    else{ // if first entry
+                        MRHEAD.next = mrPtr;
+                    }
+                    currentMR = mrPtr;
+                }
+
                 /* sprintf((currentTR->record)+trIndex, "%0X", (unsigned int)imrPtr->objectCode); */
                 /* trIndex += trLength; */
             }
@@ -821,7 +840,15 @@ int asmSecondPass(char* filename){
         fprintf(objFPtr, "H%-6s%06X%06X\n", "", STARTADR, PLENGTH);
     }
     trPtr = TRHEAD.next;
+    mrPtr = MRHEAD.next;
     while(trPtr){
+        if(trPtr->record[0] == 'E'){
+            while(mrPtr){ // write modification records
+                fprintf(objFPtr, "%s", mrPtr->record);
+                fputc('\n', objFPtr);
+                mrPtr = mrPtr->next;
+            }
+        }
         /* fprintf(objFPtr, "%s", trPtr->record); */
         for(i = 0; i < TRMAXLEN && trPtr->record[i] != '\0'; i++){
             fprintf(objFPtr, "%c", trPtr->record[i]);
@@ -839,6 +866,12 @@ int asmSecondPass(char* filename){
         currentTR = trPtr;
         trPtr = trPtr->next;
         free(currentTR);
+    }
+    mrPtr = MRHEAD.next;
+    while(mrPtr){
+        currentMR = mrPtr;
+        mrPtr = mrPtr->next;
+        free(currentMR);
     }
     fclose(lstFPtr);
     fclose(objFPtr);
