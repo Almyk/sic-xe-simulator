@@ -763,7 +763,7 @@ int asmSecondPass(char* filename){
                 if(imrPtr->e == 1 && imrPtr->n == 1 && imrPtr->i == 1){
                     mrPtr = TRALLOC();
                     mrPtr->record[0] = 'M';
-                    sprintf((mrPtr->record)+1, "%06X", (imrPtr->loc)+1);
+                    sprintf((mrPtr->record)+1, "%06X", (imrPtr->loc)+1-STARTADR);
                     sprintf((mrPtr->record)+7, "%02X", 0x05);
                     mrPtr->next = NULL;
                     if(MRHEAD.next){ // not first modification record entry
@@ -875,6 +875,7 @@ int asmSecondPass(char* filename){
         free(currentTR);
     }
     mrPtr = MRHEAD.next;
+    MRHEAD.next = NULL;
     while(mrPtr){
         currentMR = mrPtr;
         mrPtr = mrPtr->next;
