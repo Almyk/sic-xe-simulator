@@ -141,6 +141,7 @@ int asmIsRegister(struct symbolNode*);
 int asmCreateObjectCode(unsigned int, IMRNODE*, struct opcodeNode*, unsigned int, int);
 void asmByteObjectCodeCreator(struct intermediateRecordNode*);
 int asmPrintSymTab(void);
+int asmWordObjectCodeCreator(struct intermediateRecordNode*);
 
 // linker-loader functions
 int llSetProgaddr(char*);

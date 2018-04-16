@@ -713,6 +713,13 @@ int asmSecondPass(char* filename){
             else if(!strcmp(imrPtr->opcode, "BYTE")){
                 asmByteObjectCodeCreator(imrPtr);
             }
+            else if(!strcmp(imrPtr->opcode, "WORD")){
+                status = asmWordObjectCodeCreator(imrPtr);
+                if(status < 0){ // operand not a number
+                    printf("Error on line %d: operand is not a number.\n", imrPtr->linenumber);
+                    return -2;
+                }
+            }
             /* store objectcode into text record */
             if(imrPtr->objectCode){
                 /* go here */
@@ -1019,6 +1026,16 @@ void asmByteObjectCodeCreator(struct intermediateRecordNode* imrPtr){
         }
     }
     imrPtr->objectCode = TA;
+}
+
+int asmWordObjectCodeCreator(struct intermediateRecordNode* imrPtr){
+    int status;
+
+    status = (isNumber(imrPtr->operand));
+    if(status > 0){
+        imrPtr->objectCode = stringToInt(imrPtr->operand);
+    }
+    return status;
 }
 
 int asmPrintSymTab(void){
