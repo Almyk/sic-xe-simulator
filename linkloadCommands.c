@@ -175,10 +175,7 @@ int llSecondPass(FILE* fp, int CSADDR){
     int CSLTH = 0;
     int currADR = 0; // address we are currently working at
     int currLEN = 0; // length of current text record
-    int instrLEN = 0; // length of current instruction
-    int i, k;
-    unsigned char opcode; // opcode of the instruction to be put in memory
-    int format; // format of instruction
+    int k;
 
     /* read all sections in current file */
     do{
@@ -196,7 +193,7 @@ int llSecondPass(FILE* fp, int CSADDR){
                 currADR = newHexToInt(buffer+1, ADRLEN); // read address for first instruction
                 currLEN = newHexToInt(buffer+ADRLEN+1, 2); // read length of record
 
-                /* read text record */
+                /* load text record */
                 while(k - ADRLEN - 3 < 2 * currLEN){ // 2 * currLEN because 2 char per byte
                     /* object code is in half-bytes,
                        thus 2 entries from the buffer
@@ -282,6 +279,7 @@ void llExtSymTabInsert(char* symbol, int CSADDR, int length, char flag){
 void printESTAB(void){
     /* function to print External Symbol Table */
     int i;
+    int totLen = 0;
     struct esNode* ptr;
     printf("Control\t\tSymbol\n");
     printf("section\t\tname\t\tAddress\t\tLength\n");
@@ -289,13 +287,16 @@ void printESTAB(void){
     if(estabCount){ // if ESTAB is not empty
         for(i = 0; i < estabCount; i++){
             ptr = sortedESTAB[i];
-            if(ptr->flag == 'c')
+            if(ptr->flag == 'c'){
                 printf("%-6s\t\t\t\t%04X\t\t%04X\n",ptr->SYMBOL, ptr->address, ptr->length);
+                totLen += ptr->length;
+            }
             else
                 printf("\t\t%-6s\t\t%04X\n",ptr->SYMBOL, ptr->address);
         }
     }
     printf("------------------------------------------------------\n");
+    printf("\t\t\t\ttotal length %04X\n", totLen);
 }
 
 void resetESTAB(void){
