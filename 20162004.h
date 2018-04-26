@@ -16,6 +16,7 @@
 #define ESHASHSIZE 31
 #define TOKLEN 31
 #define TRMAXLEN 70
+#define ADRLEN 6
 
 // Data Structures
 struct historyNode{
@@ -147,9 +148,12 @@ int asmWordObjectCodeCreator(struct intermediateRecordNode*);
 int llSetProgaddr(char*);
 int llLoadProgram(char**, int);
 int llFirstPass(FILE*, int);
+int llSecondPass(FILE*, int);
 struct esNode* esSearch(char*, int);
 void llExtSymTabInsert(char*, int, int, char);
 void printESTAB(void);
 void resetESTAB(void);
+void llPrintError(int, char*);
+int llFindOpcodeFormat(unsigned char);
 
 #endif

@@ -2,6 +2,7 @@
 
 /* Global Variables */
 int PROGADDR = 0; // Program Address pointer
+int EXECADDR = 0; // address of instruction to be executed
 
 struct esNode* ESTAB[ESHASHSIZE]; // External Symbol Table
 struct esNode** sortedESTAB; // for printing out the ESTAB
@@ -55,12 +56,31 @@ int llLoadProgram(char **args, int n){
         CSADDR = llFirstPass(fp, CSADDR);
 
         /* print error messages */
-        if(CSADDR == -2){
-            printf("Error: File empty. (%s)\n", args[i]);
+        if(CSADDR < 0){
+            llPrintError(CSADDR, args[i]);
             return 1;
         }
-        else if(CSADDR == -3){
-            printf("Error: First row not initialized as head record. (%s)\n", args[i]);
+        fclose(fp);
+    }
+
+    /* set the address pointers */
+    CSADDR = PROGADDR;
+    EXECADDR = PROGADDR;
+
+    /* loop to run pass 2 on all given files */
+    for(i = 1; i < n; i++){
+        fp = fopen(args[i], "r");
+        if(!fp){
+            printf("Error: something went wrong opening file \"%s\"\n", args[i]);
+            return 1;
+        }
+
+        /* run pass 2 on file */
+        CSADDR = llSecondPass(fp, CSADDR);
+
+        /* print error messages */
+        if(CSADDR < 0){
+            llPrintError(CSADDR, args[i]);
             return 1;
         }
         fclose(fp);
@@ -93,7 +113,7 @@ int llFirstPass(FILE* fp, int CSADDR){
             else break;
         }
         progname[j] = '\0';
-        CSLTH = newHexToInt(buffer+13, 6);
+        CSLTH = newHexToInt(buffer+13, ADRLEN);
 
         /* search ESTAB for control section name */
         esPtr = esSearch(progname, hashcode(progname, ESHASHSIZE));
@@ -112,19 +132,19 @@ int llFirstPass(FILE* fp, int CSADDR){
                 k = 1;
                 while(k < 73 && buffer[k] != '\0'){
                     /* get symbol name */
-                    for(i = k, j = 0; i < k+6; i++, j++){
+                    for(i = k, j = 0; i < k+ADRLEN; i++, j++){
                         if(buffer[i] != ' ') progname[j] = buffer[i];
                         else break;
                     }
                     progname[j] = '\0';
-                    k += 6; // increment reading position
+                    k += ADRLEN; // increment reading position
                     /* read address */
-                    for(i = k, j = 0; i < k+6; i++, j++){
+                    for(i = k, j = 0; i < k+ADRLEN; i++, j++){
                         adrString[j] = buffer[i];
                     }
                     adrString[j] = '\0';
-                    address = newHexToInt(adrString, 6);
-                    k += 6; // increment reading position
+                    address = newHexToInt(adrString, ADRLEN);
+                    k += ADRLEN; // increment reading position
 
                     /* search ESTAB for symbol name */
                     esPtr = esSearch(progname, hashcode(progname, ESHASHSIZE));
@@ -146,6 +166,76 @@ int llFirstPass(FILE* fp, int CSADDR){
             }
         }
     } while(status);
+    return CSADDR;
+}
+
+int llSecondPass(FILE* fp, int CSADDR){
+    int status = 1;
+    char buffer[MAXBUF] = "";
+    int CSLTH = 0;
+    int currADR = 0; // address we are currently working at
+    int currLEN = 0; // length of current text record
+    int instrLEN = 0; // length of current instruction
+    int i, k;
+    unsigned char opcode; // opcode of the instruction to be put in memory
+    int format; // format of instruction
+
+    /* read all sections in current file */
+    do{
+        status = readline(buffer, fp); // read first line
+        if(!status) return -2; // empty file
+        if(buffer[0] != 'H') return -3; // first row is not head record
+        CSLTH = newHexToInt(buffer+13, ADRLEN); // read the length of program section
+
+        /* main loop for second pass */
+        while(status == 1 && (status = readline(buffer, fp))){
+            if(buffer[0] == 'E') break;
+            status = readline(buffer, fp);
+
+            if(buffer[0] == 'T'){ // text record
+                k = ADRLEN+3; // offset where first instruction starts
+                currADR = newHexToInt(buffer+1, ADRLEN); // read address for first instruction
+                currLEN = newHexToInt(buffer+ADRLEN+1, 2); // read length of record
+
+                /* read text record */
+                while(k - ADRLEN - 3 < 2 * currLEN){ // 2 * currLEN because 2 char per byte
+                    /* interpret opcode */
+                    opcode = newHexToInt(buffer+k, 2);
+                    if(opcode & 0x01) opcode -= 1; // if i bit = 1
+                    if(opcode & 0x02) opcode -= 2; // if n bit = 1
+                    format = llFindOpcodeFormat(opcode);
+
+                    /* length of instruction depends on format */
+                    if(format == 3 && buffer[k+2] & 0x1) format += 1; // extended mode == format 4
+
+                    /* add instruction to memory */
+                    for(i = 0; i < format; i++){
+                        /* object code is in half-bytes,
+                           thus 2 entries from the buffer
+                           are inserted per memory location
+                        */
+                        MEMORY[CSADDR+currADR] = buffer[k+i];
+                        MEMORY[CSADDR+currADR] = buffer[k+i+1];
+                        currADR++;
+                    }
+
+                    k += instrLEN;
+                }
+            }
+            else if(buffer[0] == 'M'){ // modification record
+            }
+        }
+        CSADDR += CSLTH;
+
+        /* find next head record */
+        if(status == 1 && buffer[0] == 'E'){
+            while(status && buffer[0] != 'H'){
+                status = readline(buffer, fp);
+            }
+        }
+    }while(status);
+
+
     return CSADDR;
 }
 
@@ -204,6 +294,7 @@ void llExtSymTabInsert(char* symbol, int CSADDR, int length, char flag){
 }
 
 void printESTAB(void){
+    /* function to print External Symbol Table */
     int i;
     struct esNode* ptr;
     printf("Control\t\tSymbol\n");
@@ -213,15 +304,16 @@ void printESTAB(void){
         for(i = 0; i < estabCount; i++){
             ptr = sortedESTAB[i];
             if(ptr->flag == 'c')
-                printf("%s\t\t\t\t%d\t\t%d\n",ptr->SYMBOL, ptr->address, ptr->length);
+                printf("%-6s\t\t\t\t%04X\t\t%04X\n",ptr->SYMBOL, ptr->address, ptr->length);
             else
-                printf("\t\t%s\t\t%d\n",ptr->SYMBOL, ptr->address);
+                printf("\t\t%-6s\t\t%04X\n",ptr->SYMBOL, ptr->address);
         }
     }
     printf("------------------------------------------------------\n");
 }
 
 void resetESTAB(void){
+    /* this function frees the memory of ESTAB data structures */
     int i;
     for(i = 0; i < estabCount; i++){
         free(sortedESTAB[i]);
@@ -229,4 +321,31 @@ void resetESTAB(void){
     free(sortedESTAB);
     estabCount = 0;
     sestabSize = 0;
+}
+
+void llPrintError(int n, char* msg){
+    switch(n){
+    case -2: printf("Error: File empty. (%s)\n", msg); break;
+    case -3: printf("Error: First row not initialized as head record. (%s)\n", msg); break;
+    }
+}
+
+int llFindOpcodeFormat(unsigned char hex){
+    /* this function looks at the OPTAB using the internal
+       representation of the opcode.
+       If opcode is found, function returns its format,
+       if not found, returns 0
+    */
+    int i;
+    struct opcodeNode* opPtr;
+
+    for(i = 0; i < HASHSIZE; i++){
+        opPtr = HASHTABLE[i];
+        while(opPtr){
+            if(opPtr->hex == hex) return opPtr->format[0] - '0';
+            opPtr = opPtr->next;
+        }
+    }
+
+    return 0;
 }
