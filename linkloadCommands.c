@@ -4,6 +4,9 @@
 int PROGADDR = 0; // Program Address pointer
 
 struct esNode* ESTAB[ESHASHSIZE]; // External Symbol Table
+struct esNode** sortedESTAB; // for printing out the ESTAB
+int sestabSize = 0; // how much space allocated sortedESTAB
+int estabCount = 0; // how many entries in ESTAB
 
 int llSetProgaddr(char* input){
     int value = 0;
@@ -22,6 +25,10 @@ int llLoadProgram(char **args, int n){
     int CSADDR = PROGADDR; // initialize CSADDR
     FILE* fp;
     int i;
+
+    if(estabCount){ // if true, need to reset
+        resetESTAB();
+    }
 
     // loop to check all filenames
     for(i = 1; i < n; i++){
@@ -43,7 +50,11 @@ int llLoadProgram(char **args, int n){
             printf("Error: something went wrong opening file \"%s\"\n", args[i]);
             return 1;
         }
+
+        /* run pass 1 on file*/
         CSADDR = llFirstPass(fp, CSADDR);
+
+        /* print error messages */
         if(CSADDR == -2){
             printf("Error: File empty. (%s)\n", args[i]);
             return 1;
@@ -55,7 +66,7 @@ int llLoadProgram(char **args, int n){
         fclose(fp);
     }
 
-
+    printESTAB();
     return status;
 }
 
@@ -178,4 +189,44 @@ void llExtSymTabInsert(char* symbol, int CSADDR, int length, char flag){
         newNode->last = NULL;
         ESTAB[hash] = newNode;
     }
+
+    /* add to sortedESTAB */
+    if(!sestabSize){ // first entry
+        sortedESTAB = (struct esNode**) calloc(10, sizeof(struct esNode*));
+        sestabSize = 10;
+    }
+    if(estabCount == sestabSize){ // if we need to resize sortedESTAB
+        sortedESTAB = (struct esNode**) realloc(sortedESTAB, 2*sestabSize*sizeof(struct esNode*));
+        sestabSize *= 2;
+    }
+    sortedESTAB[estabCount] = newNode;
+    estabCount++;
+}
+
+void printESTAB(void){
+    int i;
+    struct esNode* ptr;
+    printf("Control\t\tSymbol\n");
+    printf("section\t\tname\t\tAddress\t\tLength\n");
+    printf("------------------------------------------------------\n");
+    if(estabCount){ // if ESTAB is not empty
+        for(i = 0; i < estabCount; i++){
+            ptr = sortedESTAB[i];
+            if(ptr->flag == 'c')
+                printf("%s\t\t\t\t%d\t\t%d\n",ptr->SYMBOL, ptr->address, ptr->length);
+            else
+                printf("\t\t%s\t\t%d\n",ptr->SYMBOL, ptr->address);
+        }
+    }
+    printf("------------------------------------------------------\n");
+}
+
+void resetESTAB(void){
+    int i;
+    for(i = 0; i < estabCount; i++){
+        free(sortedESTAB[i]);
+    }
+    free(sortedESTAB);
+    estabCount = 0;
+    sestabSize = 0;
 }

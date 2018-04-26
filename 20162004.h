@@ -149,5 +149,7 @@ int llLoadProgram(char**, int);
 int llFirstPass(FILE*, int);
 struct esNode* esSearch(char*, int);
 void llExtSymTabInsert(char*, int, int, char);
+void printESTAB(void);
+void resetESTAB(void);
 
 #endif

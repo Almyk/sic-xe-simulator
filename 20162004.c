@@ -28,6 +28,7 @@ int main(void){
     freeHistory();
     freeHashtable();
     initializeASM(0);
+    resetESTAB();
 
     return 1;
 }
