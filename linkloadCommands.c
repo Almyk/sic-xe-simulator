@@ -113,7 +113,7 @@ int llFirstPass(FILE* fp, int CSADDR){
             else break;
         }
         progname[j] = '\0';
-        CSLTH = newHexToInt(buffer+13, ADRLEN);
+        CSLTH = newHexToInt(buffer+13, ADDRLEN);
 
         /* search ESTAB for control section name */
         esPtr = esSearch(progname, hashcode(progname, ESHASHSIZE));
@@ -132,19 +132,19 @@ int llFirstPass(FILE* fp, int CSADDR){
                 k = 1;
                 while(k < 73 && buffer[k] != '\0'){
                     /* get symbol name */
-                    for(i = k, j = 0; i < k+ADRLEN; i++, j++){
+                    for(i = k, j = 0; i < k+ADDRLEN; i++, j++){
                         if(buffer[i] != ' ') progname[j] = buffer[i];
                         else break;
                     }
                     progname[j] = '\0';
-                    k += ADRLEN; // increment reading position
+                    k += ADDRLEN; // increment reading position
                     /* read address */
-                    for(i = k, j = 0; i < k+ADRLEN; i++, j++){
+                    for(i = k, j = 0; i < k+ADDRLEN; i++, j++){
                         adrString[j] = buffer[i];
                     }
                     adrString[j] = '\0';
-                    address = newHexToInt(adrString, ADRLEN);
-                    k += ADRLEN; // increment reading position
+                    address = newHexToInt(adrString, ADDRLEN);
+                    k += ADDRLEN; // increment reading position
 
                     /* search ESTAB for symbol name */
                     esPtr = esSearch(progname, hashcode(progname, ESHASHSIZE));
@@ -182,19 +182,19 @@ int llSecondPass(FILE* fp, int CSADDR){
         status = readline(buffer, fp); // read first line
         if(!status) return -2; // empty file
         if(buffer[0] != 'H') return -3; // first row is not head record
-        CSLTH = newHexToInt(buffer+13, ADRLEN); // read the length of program section
+        CSLTH = newHexToInt(buffer+13, ADDRLEN); // read the length of program section
 
         /* main loop for second pass */
         while(status == 1 && (status = readline(buffer, fp))){
             if(buffer[0] == 'E') break;
 
             if(buffer[0] == 'T'){ // text record
-                k = ADRLEN+3; // offset where first instruction starts
-                currADR = newHexToInt(buffer+1, ADRLEN); // read address for first instruction
-                currLEN = newHexToInt(buffer+ADRLEN+1, 2); // read length of record
+                k = ADDRLEN+3; // offset where first instruction starts
+                currADR = newHexToInt(buffer+1, ADDRLEN); // read address for first instruction
+                currLEN = newHexToInt(buffer+ADDRLEN+1, 2); // read length of record
 
                 /* load text record */
-                while(k - ADRLEN - 3 < 2 * currLEN){ // 2 * currLEN because 2 char per byte
+                while(k - ADDRLEN - 3 < 2 * currLEN){ // 2 * currLEN because 2 char per byte
                     /* object code is in half-bytes,
                        thus 2 entries from the buffer
                        are inserted per memory location

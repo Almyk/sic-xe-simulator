@@ -16,7 +16,7 @@
 #define ESHASHSIZE 31
 #define TOKLEN 31
 #define TRMAXLEN 70
-#define ADRLEN 6
+#define ADDRLEN 6
 
 // Data Structures
 struct historyNode{
