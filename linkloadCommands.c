@@ -190,7 +190,6 @@ int llSecondPass(FILE* fp, int CSADDR){
         /* main loop for second pass */
         while(status == 1 && (status = readline(buffer, fp))){
             if(buffer[0] == 'E') break;
-            status = readline(buffer, fp);
 
             if(buffer[0] == 'T'){ // text record
                 k = ADRLEN+3; // offset where first instruction starts
@@ -199,30 +198,17 @@ int llSecondPass(FILE* fp, int CSADDR){
 
                 /* read text record */
                 while(k - ADRLEN - 3 < 2 * currLEN){ // 2 * currLEN because 2 char per byte
-                    /* interpret opcode */
-                    opcode = newHexToInt(buffer+k, 2);
-                    if(opcode & 0x01) opcode -= 1; // if i bit = 1
-                    if(opcode & 0x02) opcode -= 2; // if n bit = 1
-                    format = llFindOpcodeFormat(opcode);
-
-                    /* length of instruction depends on format */
-                    if(format == 3 && buffer[k+2] & 0x1) format += 1; // extended mode == format 4
-
-                    /* add instruction to memory */
-                    for(i = 0; i < format; i++){
-                        /* object code is in half-bytes,
-                           thus 2 entries from the buffer
-                           are inserted per memory location
-                        */
-                        MEMORY[CSADDR+currADR] = buffer[k+i];
-                        MEMORY[CSADDR+currADR] = buffer[k+i+1];
-                        currADR++;
-                    }
-
-                    k += instrLEN;
+                    /* object code is in half-bytes,
+                       thus 2 entries from the buffer
+                       are inserted per memory location
+                    */
+                    MEMORY[CSADDR+currADR] = newHexToInt(&buffer[k], 2);
+                    currADR++;
+                    k += 2;
                 }
             }
             else if(buffer[0] == 'M'){ // modification record
+                ;
             }
         }
         CSADDR += CSLTH;
