@@ -382,3 +382,13 @@ int newHexToInt(char* string, int n){
 
     return result;
 }
+
+int newStringToInt(char* string, int n){
+    /* similar to stringToInt, but in this version you can specify string length */
+    int i;
+    int result = 0;
+    for(i = 0; i < n; i++){
+        result += (string[i] - '0') * power(10, n-i-1);
+    }
+    return result;
+}

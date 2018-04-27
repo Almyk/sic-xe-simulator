@@ -172,16 +172,31 @@ int llFirstPass(FILE* fp, int CSADDR){
 int llSecondPass(FILE* fp, int CSADDR){
     int status = 1;
     char buffer[MAXBUF] = "";
+    char progname[7];
     int CSLTH = 0;
     int currADR = 0; // address we are currently working at
     int currLEN = 0; // length of current text record
-    int k;
+    int i, j, k; // index offset variables
+    struct esNode** refRecord = (struct esNode**) calloc(estabCount, sizeof(struct esNode*));
+    char refName[7]; // reference symbol name
+    int refNum; // used for reference records
+    /* unsigned char bytes[4]; // used to split addresses into their individual bits */
+    int instructionADDR;
+    char hbFlag = 'f'; // half-byte flag
 
     /* read all sections in current file */
     do{
         status = readline(buffer, fp); // read first line
         if(!status) return -2; // empty file
         if(buffer[0] != 'H') return -3; // first row is not head record
+
+        /* read head record */
+        for(i = 1, j = 0; i < 7; i++, j++){
+            if(buffer[i] != ' ') progname[j] = buffer[i];
+            else break;
+        }
+        progname[j] = '\0';
+        refRecord[1] = esSearch(progname, hashcode(progname, ESHASHSIZE));
         CSLTH = newHexToInt(buffer+13, ADDRLEN); // read the length of program section
 
         /* main loop for second pass */
@@ -205,7 +220,75 @@ int llSecondPass(FILE* fp, int CSADDR){
                 }
             }
             else if(buffer[0] == 'M'){ // modification record
-                ;
+                hbFlag = 'f'; // set half-byte flag to false
+                refNum = newHexToInt(buffer+10, 2); // grab the reference number for the reference record
+                if(refRecord[refNum]){
+                    currADR = newHexToInt(buffer+1, ADDRLEN); // get address to change
+                    currLEN = newHexToInt(buffer+ADDRLEN+1, 2); // length of address in half-bytes
+                    if(currLEN % 2){
+                        currLEN += 1; // if uneven number add 1 to amount of bytes to grab
+                        hbFlag = 't'; // set half-byte flag to true
+                    }
+                    currLEN = currLEN / 2; // find how many bytes to change
+                    instructionADDR = 0;
+                    /* gather the bytes that are to be changed */
+                    for(i = 0; i < currLEN; i++){
+                        if(i == 0 && hbFlag == 't') // only grab half of the byte
+                            instructionADDR += MEMORY[CSADDR+currADR] & 0x0F;
+                        else
+                            instructionADDR += MEMORY[CSADDR+currADR+i];
+                        if(i + 1 < currLEN)
+                            instructionADDR <<= 8; // shift 1 byte left
+                    }
+                    if(buffer[9] == '+') instructionADDR += refRecord[refNum]->address;
+                    else if(buffer[9] == '-') instructionADDR -= refRecord[refNum]->address;
+                    else{
+                        printf("Error: Incorrect sign '%c' in modification record.\n", buffer[9]);
+                        return -1;
+                    }
+                    /* split address back into separate bytes and place them in memory */
+                    for(i = 0; i < currLEN; i++){
+                        if(i == 0 && hbFlag == 't'){ // first byte to insert should only be a half-byte
+                            MEMORY[CSADDR+currADR] = MEMORY[CSADDR+currADR] & 0xF0; // remove lower half
+                            /* add only lower half-byte by first shifting the bits
+                               the needed amount to the right and doing bitwise AND to
+                               only store the intended byte
+                            */
+                            MEMORY[CSADDR+currADR] += (instructionADDR >> 8 * (currLEN - 1)) & 0x0F;
+                        }
+                        else{ // add the full byte to memory
+                            MEMORY[CSADDR+currADR+i] = (instructionADDR >> 8 * (currLEN - i - 1)) & 0xFF;
+                        }
+                    }
+                }
+                else{
+                    printf("Error: Reference Number %02X not found.\n", refNum);
+                    return -1;
+                }
+            }
+            else if(buffer[0] == 'R'){ // Reference Record
+                /* create array of symbols listed */
+                k = 1;
+                /* while not end of line and not exceeding entries in ESTAB */
+                while(buffer[k] != '\0' && (k-1)/8 < estabCount){ // 8 = 2 chars for index + 6 for symbol
+                    /* get the index number */
+                    refNum = newHexToInt(buffer+k, 2);
+                    k += 2;
+                    /* copy symbol name from buffer */
+                    for(i = 0; i < 6; i++){
+                        refName[i] = buffer[k+i];
+                        if(refName[i] == ' ') break;
+                    }
+                    refName[i] = '\0';
+                    k += 6;
+                    /* search for symbol in ESTAB */
+                    refRecord[refNum] = esSearch(refName, hashcode(refName, ESHASHSIZE));
+
+                    if(!refRecord[refNum]){ // reference not found
+                        printf("Error: The reference %s was not found.\n", refName);
+                        return -1;
+                    }
+                }
             }
         }
         CSADDR += CSLTH;
@@ -219,6 +302,7 @@ int llSecondPass(FILE* fp, int CSADDR){
     }while(status);
 
 
+    free(refRecord);
     return CSADDR;
 }
 

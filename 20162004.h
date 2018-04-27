@@ -104,6 +104,7 @@ int getToken(const char*, char*, int, int*);
 struct textRecordNode* TRALLOC(void);
 int isNumber(char*);
 int newHexToInt(char*, int);
+int newStringToInt(char*, int);
 
 
 // Functions regarding memory
