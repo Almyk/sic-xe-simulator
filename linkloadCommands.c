@@ -291,8 +291,13 @@ int llSecondPass(FILE* fp, int CSADDR){
                 }
             }
         }
-        CSADDR += CSLTH;
+        if(buffer[0] == 'E'){ // check if there is an address in End Record
+            if(buffer[1]){
+                EXECADDR = newHexToInt(buffer+1, 6);
+            }
+        }
 
+        CSADDR += CSLTH;
         /* find next head record */
         if(status == 1 && buffer[0] == 'E'){
             while(status && buffer[0] != 'H'){
