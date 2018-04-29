@@ -156,5 +156,11 @@ void printESTAB(void);
 void resetESTAB(void);
 void llPrintError(int, char*);
 int llFindOpcodeFormat(unsigned char);
+int llRun(void);
+int llTargetAddress(int, int);
+int llFetchFromMemory(int, int);
+void llSetRegVal(int, int);
+int llInterpretTA(int, unsigned char, int);
+void llLoadToAddress(int address, int value, int n);
 
 #endif

@@ -55,8 +55,9 @@ int runCommand(char **args, int n){
         else if(n == 2 && !(strcmp(args[0], "assemble"))){
             status = asmAssemble(args[1]);
         }
-        else if(n == 2 && !(strcmp(args[0], "progaddr"))){
-            status = llSetProgaddr(args[1]);
+        else if((n == 2 || n == 1) && !(strcmp(args[0], "progaddr"))){
+            if(n == 2) status = llSetProgaddr(args[1]);
+            if(n == 1) status = llSetProgaddr("0");
         }
         else if(n >= 2 && !(strcmp(args[0], "loader"))){
             status = llLoadProgram(args, n);
@@ -75,6 +76,7 @@ int runCommand(char **args, int n){
             else if(!(strcmp(args[0], "opcodelist"))) status = opPrintOpcodelist();
             else if(!(strcmp(args[0], "reset"))) status = memReset();
             else if(!(strcmp(args[0], "symbol"))) status = asmPrintSymTab();
+            else if(!(strcmp(args[0], "run"))) status = llRun();
             else status = -1;
         }
         // if no match

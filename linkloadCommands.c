@@ -3,11 +3,19 @@
 /* Global Variables */
 int PROGADDR = 0; // Program Address pointer
 int EXECADDR = 0; // address of instruction to be executed
+int PROGLEN = 0;
 
+/* External System Table */
 struct esNode* ESTAB[ESHASHSIZE]; // External Symbol Table
 struct esNode** sortedESTAB; // for printing out the ESTAB
 int sestabSize = 0; // how much space allocated sortedESTAB
 int estabCount = 0; // how many entries in ESTAB
+
+/* registers */
+int A = 0; int X = 0;
+int L = 0; int B = 0;
+int S = 0; int T = 0;
+int PC = 0; int SW = 0;
 
 int llSetProgaddr(char* input){
     int value = 0;
@@ -174,7 +182,7 @@ int llSecondPass(FILE* fp, int CSADDR){
     char buffer[MAXBUF] = "";
     char progname[7];
     int CSLTH = 0;
-    int currADR = 0; // address we are currently working at
+    int currADDR = 0; // address we are currently working at
     int currLEN = 0; // length of current text record
     int i, j, k; // index offset variables
     struct esNode** refRecord = (struct esNode**) calloc(estabCount, sizeof(struct esNode*));
@@ -205,7 +213,7 @@ int llSecondPass(FILE* fp, int CSADDR){
 
             if(buffer[0] == 'T'){ // text record
                 k = ADDRLEN+3; // offset where first instruction starts
-                currADR = newHexToInt(buffer+1, ADDRLEN); // read address for first instruction
+                currADDR = newHexToInt(buffer+1, ADDRLEN); // read address for first instruction
                 currLEN = newHexToInt(buffer+ADDRLEN+1, 2); // read length of record
 
                 /* load text record */
@@ -214,8 +222,8 @@ int llSecondPass(FILE* fp, int CSADDR){
                        thus 2 entries from the buffer
                        are inserted per memory location
                     */
-                    MEMORY[CSADDR+currADR] = newHexToInt(&buffer[k], 2);
-                    currADR++;
+                    MEMORY[CSADDR+currADDR] = newHexToInt(&buffer[k], 2);
+                    currADDR++;
                     k += 2;
                 }
             }
@@ -223,7 +231,7 @@ int llSecondPass(FILE* fp, int CSADDR){
                 hbFlag = 'f'; // set half-byte flag to false
                 refNum = newHexToInt(buffer+10, 2); // grab the reference number for the reference record
                 if(refRecord[refNum]){
-                    currADR = newHexToInt(buffer+1, ADDRLEN); // get address to change
+                    currADDR = newHexToInt(buffer+1, ADDRLEN); // get address to change
                     currLEN = newHexToInt(buffer+ADDRLEN+1, 2); // length of address in half-bytes
                     if(currLEN % 2){
                         currLEN += 1; // if uneven number add 1 to amount of bytes to grab
@@ -234,9 +242,9 @@ int llSecondPass(FILE* fp, int CSADDR){
                     /* gather the bytes that are to be changed */
                     for(i = 0; i < currLEN; i++){
                         if(i == 0 && hbFlag == 't') // only grab half of the byte
-                            instructionADDR += MEMORY[CSADDR+currADR] & 0x0F;
+                            instructionADDR += MEMORY[CSADDR+currADDR] & 0x0F;
                         else
-                            instructionADDR += MEMORY[CSADDR+currADR+i];
+                            instructionADDR += MEMORY[CSADDR+currADDR+i];
                         if(i + 1 < currLEN)
                             instructionADDR <<= 8; // shift 1 byte left
                     }
@@ -249,15 +257,15 @@ int llSecondPass(FILE* fp, int CSADDR){
                     /* split address back into separate bytes and place them in memory */
                     for(i = 0; i < currLEN; i++){
                         if(i == 0 && hbFlag == 't'){ // first byte to insert should only be a half-byte
-                            MEMORY[CSADDR+currADR] = MEMORY[CSADDR+currADR] & 0xF0; // remove lower half
+                            MEMORY[CSADDR+currADDR] = MEMORY[CSADDR+currADDR] & 0xF0; // remove lower half
                             /* add only lower half-byte by first shifting the bits
                                the needed amount to the right and doing bitwise AND to
                                only store the intended byte
                             */
-                            MEMORY[CSADDR+currADR] += (instructionADDR >> 8 * (currLEN - 1)) & 0x0F;
+                            MEMORY[CSADDR+currADDR] += (instructionADDR >> 8 * (currLEN - 1)) & 0x0F;
                         }
                         else{ // add the full byte to memory
-                            MEMORY[CSADDR+currADR+i] = (instructionADDR >> 8 * (currLEN - i - 1)) & 0xFF;
+                            MEMORY[CSADDR+currADDR+i] = (instructionADDR >> 8 * (currLEN - i - 1)) & 0xFF;
                         }
                     }
                 }
@@ -386,6 +394,7 @@ void printESTAB(void){
     }
     printf("------------------------------------------------------\n");
     printf("\t\t\t\ttotal length %04X\n", totLen);
+    PROGLEN = totLen;
 }
 
 void resetESTAB(void){
@@ -424,4 +433,319 @@ int llFindOpcodeFormat(unsigned char hex){
     }
 
     return 0;
+}
+
+int llRun(void){
+    unsigned char opcode;
+    unsigned char ni;
+    int format;
+    int instruction;
+    int targetADDR; // Target Address
+    int r1, r2; // register 1 & 2 for instructions using registers
+
+    /* initialize Program Counter */
+    PC = EXECADDR;
+
+    while(1){
+        if(PC > 0xFFFFF) break; // out of memory range
+        if(PC > PROGADDR + PROGLEN) break; // reached end of program
+
+        /* get object code and ni bits*/
+        opcode = MEMORY[PC] & 0xFC; // ignores the 2 LSB
+        ni = MEMORY[PC] & 0x03; // ignores all but 2 LSB
+
+        /* find opcode format */
+        format = llFindOpcodeFormat(opcode);
+        if(!format){ // invalid opcode
+            printf("Error: invalid opcode %02X\n", opcode);
+            return -1;
+        }
+
+        /* get full instruction */
+        instruction = MEMORY[PC];
+        switch(format){
+        case 2:
+            instruction <<= 8;
+            instruction += MEMORY[PC+1];
+            break;
+        case 3:
+            instruction <<= 8;
+            instruction += MEMORY[PC+1];
+            instruction <<= 8;
+            instruction += MEMORY[PC+2];
+            if(!(MEMORY[PC+1] & 0x10)) break; // if the e bit is 0 we break else it is format 4
+        case 4:
+            instruction <<= 8;
+            instruction += MEMORY[PC+3];
+            format = 4;
+            break;
+        }
+
+        /* program counter should be advanced after reading an instruction */
+        PC += format;
+
+        /* get target address if format 3 or 4 */
+        if(format >= 3){
+            targetADDR = llTargetAddress(instruction, format) + PROGADDR;
+        }
+
+        /* printf("Instruction: %08X\n", instruction); */
+        /* printf("Format: %d\n", format); */
+        /* printf("TA: %06X\n", targetADDR); */
+        /* printf("A: %06X, PC: %06X\n", A, PC); */
+        /* printf("B: %06X, X: %06X\n", B, X); */
+        /* printf("L: %06X, SW: %06X\n", L, SW); */
+
+        /* execute instruction */
+        switch(opcode){
+
+            /* Format 2 */
+        case 0x90: // ADDR
+            break;
+        case 0xB4: // CLEAR
+            r1 = instruction & 0xF0;
+            r1 >>= 4;
+
+            llSetRegVal(r1, 0);
+            break;
+        case 0xA0: // COMPR
+            r1 = instruction & 0xF0;
+            r1 >>= 4;
+            r2 = instruction & 0xF;
+
+            if(r1 < r2) SW = -1;
+            else if(r1 > r2) SW = 1;
+            else  SW = 0;
+            break;
+        case 0x9C: // DIVR
+            break;
+        case 0x98: // MULR
+            break;
+        case 0xAC: // RMO
+            break;
+        case 0xA4: // SHIFTL
+            break;
+        case 0x94: // SUBR
+            break;
+        case 0xB0: // SVC
+            break;
+        case 0xB8: // TIXR
+            X += 1;
+            r1 = instruction & 0xF0;
+            r1 >>= 4;
+
+            if(X < r1) SW = -1;
+            else if(X > r1) SW = 1;
+            else  SW = 0;
+            break;
+
+            /* Format 3/4 */
+        case 0x18: // ADD
+            break;
+        case 0x40: // AND
+            break;
+        case 0x28: // COMP
+            if(A > targetADDR) SW = 1;
+            else if(A < targetADDR) SW = -1;
+            else SW = 0;
+            break;
+        case 0x24: // DIV
+            break;
+        case 0x3C: // J
+            PC = targetADDR;
+            break;
+        case 0x30: // JEQ
+            if(SW == 0) PC = targetADDR;
+            break;
+        case 0x34: // JGT
+            if(SW > 0) PC = targetADDR;
+            break;
+        case 0x38: // JLT
+            if(SW < 0) PC = targetADDR;
+            break;
+        case 0x48: // JSUB
+            L = PC;
+            PC = targetADDR;
+            break;
+        case 0x00: // LDA
+            A = llInterpretTA(targetADDR, ni, format);
+            break;
+        case 0x68: // LDB
+            B = llInterpretTA(targetADDR, ni, format);
+            break;
+        case 0x50: // LDCH
+            A = A & 0xFFFF00; // clear last byte
+            A += llInterpretTA(targetADDR, ni, format) & 0x0FF; // only load last byte
+            break;
+        case 0x08: // LDL
+            L = llInterpretTA(targetADDR, ni, format);
+            break;
+        case 0x6C: // LDS
+            S = llInterpretTA(targetADDR, ni, format);
+            break;
+        case 0x74: // LDT
+            T = llInterpretTA(targetADDR, ni, format);
+            break;
+        case 0x04: // LDX
+            X = llInterpretTA(targetADDR, ni, format);
+            break;
+        case 0xD0: // LPS
+            break;
+        case 0x20: // MUL
+            break;
+        case 0x44: // OR
+            break;
+        case 0x4C: // RSUB
+            PC = L;
+            break;
+        case 0x0C: // STA
+            llLoadToAddress(targetADDR, A, 6);
+            break;
+        case 0x78: // STB
+            llLoadToAddress(targetADDR, B, 6);
+            break;
+        case 0x54: // STCH
+            llLoadToAddress(targetADDR, A & 0x0FF, 6);
+            break;
+        case 0x14: // STL
+            llLoadToAddress(targetADDR, L, 6);
+            break;
+        case 0x7C: // STS
+            llLoadToAddress(targetADDR, S, 6);
+            break;
+        case 0xE8: // STSW
+            llLoadToAddress(targetADDR, SW, 6);
+            break;
+        case 0x84: // STT
+            llLoadToAddress(targetADDR, T, 6);
+            break;
+        case 0x10: // STX
+            llLoadToAddress(targetADDR, X, 6);
+            break;
+        case 0x1C: // SUB
+            break;
+        case 0x2C: // TIX
+            break;
+        }
+    }
+
+    return 1;
+}
+
+int llTargetAddress(int instruction, int format){
+    int targetADDR = 0;
+    int x, b, p;
+    x = b = p = 0;
+
+    /* find xbp bits and target address */
+    switch(format){
+    case 3:
+        x = instruction & 0x8000;
+        b = instruction & 0x4000;
+        p = instruction & 0x2000;
+        targetADDR = instruction & 0xFFF;
+        break;
+    case 4:
+        x = instruction & 0x800000;
+        b = instruction & 0x400000;
+        p = instruction & 0x200000;
+        targetADDR = instruction & 0xFFFFF;
+        break;
+    }
+    if(x){
+        targetADDR += X;
+    }
+    if(b){
+        targetADDR += B;
+    }
+    else if(p){
+        targetADDR += PC;
+    }
+
+    return targetADDR;
+}
+
+int llFetchFromMemory(int loc, int n){
+    /* this function fetches n half-bytes from memory */
+    int address = 0;
+    int i = 0;
+
+    if(n % 2){ // odd amount of half-bytes
+        address = MEMORY[loc] & 0x0F; // take only half-byte
+        i = 1;
+    }
+
+    /* get remaining half-bytes */
+    for(; i * 2 < n; i++){
+        address <<= 8;
+        address += MEMORY[loc+i];
+    }
+
+    return address;
+}
+
+void llSetRegVal(int reg, int value){
+    /* this function assigns a value to register */
+
+    switch(reg){
+    case 0: // A
+        A = value;
+        break;
+    case 1: // X
+        X = value;
+        break;
+    case 2: // L
+        L = value;
+        break;
+    case 3: // B
+        B = value;
+        break;
+    case 4: // S
+        S = value;
+        break;
+    case 5: // T
+        T = value;
+        break;
+    case 8: // PC
+        PC = value;
+        break;
+    case 9: // SW
+        SW = value;
+        break;
+    }
+}
+
+int llInterpretTA(int targetADDR, unsigned char ni, int format){
+    int value = 0;
+    switch(ni){
+    case 0x01: // immediate mode
+        value = targetADDR;
+        break;
+    case 0x02: // indirect mode
+        value = llFetchFromMemory(targetADDR, format * 2);
+        value = llFetchFromMemory(value, format * 2);
+        break;
+    case 0x03: // simple mode
+        value = llFetchFromMemory(targetADDR, format * 2);
+        break;
+    }
+    return value;
+}
+
+void llLoadToAddress(int address, int value, int n){
+    /* insert value into MEMORY[address..adress+(n/2)] , n is in half-bytes */
+    int i = 0;
+    int k = 0;
+    int bytes = n / 2;
+
+    if(n % 2){ // if uneven amount of half-bytes
+        MEMORY[address] = MEMORY[address] & 0xF0; // clear lower half-byte
+        MEMORY[address] += (value >> ((n/2) * 8)) & 0x0F; // add lower half-byte
+        i = 1;
+    }
+
+    for(; i < bytes; i++){
+        MEMORY[address+i] += (value >> (8 * (bytes-k-1))) & 0xFF; // add one byte to memory
+        k++;
+    }
 }
