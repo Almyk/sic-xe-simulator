@@ -1,8 +1,9 @@
 Information about the program:
     This program is a simple shell simulating the SIC(Simplified Instruction Computer).
-    In the latest version there is also an assembler included for the SIC/XE assembly code.
+    In the latest version there is also an assembler included for the SIC/XE assembly code,
+    as well as a linker and loader. It is also to some extent possible to run the programs loaded to memory.
     The program consists of the files: 
-    	20162004.c, shellCommands.c, memoryCommands.c, opcodeCommands.c, generalFunctions.c, asmCommands.c and 20162004.h
+    	20162004.c, shellCommands.c, memoryCommands.c, opcodeCommands.c, generalFunctions.c, asmCommands.c, linkloadCommans.c and 20162004.h
     In the header file the necessary libraries are included and the constants and data structures are defined.
     The global variables for the Virtual Memory and the Hashtable is defined in 20162004.c
     The program also need a makefile for the compilation of the program.
