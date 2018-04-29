@@ -162,5 +162,10 @@ int llFetchFromMemory(int, int);
 void llSetRegVal(int, int);
 int llInterpretTA(int, unsigned char, int);
 void llLoadToAddress(int address, int value, int n);
+void llPrintReg(void);
+int llBreakPoint(char**, int);
+void llPrintBP(void);
+int llAddBP(int, char*);
+void llClearBP(void);
 
 #endif

@@ -17,6 +17,11 @@ int L = 0; int B = 0;
 int S = 0; int T = 0;
 int PC = 0; int SW = 0;
 
+/* Breakpoint */
+int* BP;
+int bpCurrentMax = 0;
+int bpCount = 0;
+
 int llSetProgaddr(char* input){
     int value = 0;
 
@@ -24,7 +29,7 @@ int llSetProgaddr(char* input){
     value = hexToInt(input);
     // if input string is a hexadecimal value we store it in PROGADDR
     if(value >= 0) PROGADDR = value;
-    else return value;
+    else value = -1;
 
     return 1;
 }
@@ -400,8 +405,17 @@ void printESTAB(void){
 void resetESTAB(void){
     /* this function frees the memory of ESTAB data structures */
     int i;
-    for(i = 0; i < estabCount; i++){
-        free(sortedESTAB[i]);
+    struct esNode* esPtr, *esDelete;
+    for(i = 0; i < ESHASHSIZE; i++){
+        if(ESTAB[i]){
+            esPtr = ESTAB[i];
+            while(esPtr){
+                esDelete = esPtr;
+                esPtr = esPtr->next;
+                free(esDelete);
+            }
+            ESTAB[i] = NULL;
+        }
     }
     free(sortedESTAB);
     estabCount = 0;
@@ -442,13 +456,26 @@ int llRun(void){
     int instruction;
     int targetADDR; // Target Address
     int r1, r2; // register 1 & 2 for instructions using registers
+    static int bpIDX = 0;
 
     /* initialize Program Counter */
     PC = EXECADDR;
+    if(bpIDX) PC = BP[bpIDX-1];
 
     while(1){
+
+        /* checking for breakpoint */
+        if(bpIDX < bpCount){
+            if(BP[bpIDX] == PC){
+                bpIDX++;
+                llPrintReg();
+                printf("Stop at checkpoint[%04X]\n", PC);
+                return 1;
+            }
+        }
+
         if(PC > 0xFFFFF) break; // out of memory range
-        if(PC > PROGADDR + PROGLEN) break; // reached end of program
+        if(PROGLEN > 0 && PC > PROGADDR + PROGLEN) break; // reached end of program
 
         /* get object code and ni bits*/
         opcode = MEMORY[PC] & 0xFC; // ignores the 2 LSB
@@ -629,6 +656,10 @@ int llRun(void){
         }
     }
 
+    llPrintReg();
+    printf("End Program\n");
+    bpIDX = 0;
+
     return 1;
 }
 
@@ -747,5 +778,77 @@ void llLoadToAddress(int address, int value, int n){
     for(; i < bytes; i++){
         MEMORY[address+i] += (value >> (8 * (bytes-k-1))) & 0xFF; // add one byte to memory
         k++;
+    }
+}
+
+void llPrintReg(void){
+    printf("   A : %012X X : %012X\n", A, X);
+    printf("   L : %012X PC: %012X\n", L, PC);
+    printf("   B : %012X S : %012X\n", B, S);
+    printf("   T : %012X\n", T);
+}
+
+int llBreakPoint(char** args, int n){
+    int status = 0;
+
+    switch(n){
+    case 1: llPrintBP(); return 1;
+    case 2: status = strcmp(args[1], "clear");
+        break;
+    }
+
+    if(!status){ // if argument is "clear"
+        llClearBP();
+    }
+    else{ // if argument is an address
+        status = llAddBP(hexToInt(args[1]), args[1]);
+    }
+
+    return 1;
+}
+
+void llPrintBP(void){
+    int i;
+    if(bpCount){
+        printf("\tbreakpoint\n");
+        printf("\t----------\n");
+        for(i = 0; i < bpCount; i++){
+            printf("\t%04X\n", BP[i]);
+        }
+    }
+    else printf("No breakpoints are set.\n");
+}
+
+int llAddBP(int breakpoint, char* input){
+    if(breakpoint < 0){ // invalid breakpoint
+        printf("Error: Given breakpoint is invalid. (%s)\n", input);
+        return -1;
+    }
+
+    if(!bpCount){ // first breakpoint
+        BP = calloc(5, sizeof(int));
+        bpCurrentMax = 5;
+    }
+    else if(bpCount >= bpCurrentMax){ // reallocates twice the size of current memory when array is full
+        BP = realloc(BP, bpCurrentMax * 2 * sizeof(int));
+        bpCurrentMax *= 2;
+    }
+    /* Add breakpoint to list */
+    BP[bpCount] = breakpoint;
+    bpCount++;
+
+    printf("\t[ok] created breakpoint %04X\n", breakpoint);
+
+    return 1;
+}
+
+void llClearBP(void){
+    if(bpCount){
+        free(BP);
+        bpCurrentMax = 0; bpCount = 0;
+        printf("\t[ok] clear all breakpoints\n");
+    }
+    else{
+        printf("No Breakpoints inserted. Nothing to clear.\n");
     }
 }
