@@ -166,6 +166,7 @@ void llPrintReg(void);
 int llBreakPoint(char**, int);
 void llPrintBP(void);
 int llAddBP(int, char*);
-void llClearBP(void);
+void llClearBP(int mode);
+int llGetRegVal(int);
 
 #endif

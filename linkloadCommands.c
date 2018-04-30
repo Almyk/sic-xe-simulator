@@ -455,12 +455,15 @@ int llRun(void){
     int format;
     int instruction;
     int targetADDR; // Target Address
+    /* int valueAtTA; */
     int r1, r2; // register 1 & 2 for instructions using registers
     static int bpIDX = 0;
 
     /* initialize Program Counter */
     PC = EXECADDR;
-    if(bpIDX) PC = BP[bpIDX-1];
+    if(bpIDX) PC = BP[bpIDX-1]; // if we have encountered a breakpoint start from last run
+    /* if running for the first time, set return address to 0xFFFFF so that there is no endless loop */
+    else(L = 0xFFFFFF);
 
     while(1){
 
@@ -514,17 +517,25 @@ int llRun(void){
         /* get target address if format 3 or 4 */
         if(format >= 3){
             targetADDR = llTargetAddress(instruction, format) + PROGADDR;
+            instruction = llFetchFromMemory(targetADDR, format * 2);
+            /* if indirect addressing */
+            if(ni == 2){
+                targetADDR = instruction; // then TA should be value at TA
+            }
         }
-
-        /* printf("Instruction: %08X\n", instruction); */
-        /* printf("Format: %d\n", format); */
-        /* printf("TA: %06X\n", targetADDR); */
-        /* printf("A: %06X, PC: %06X\n", A, PC); */
-        /* printf("B: %06X, X: %06X\n", B, X); */
-        /* printf("L: %06X, SW: %06X\n", L, SW); */
 
         /* execute instruction */
         switch(opcode){
+
+            /* I/O */
+        case 0xE0: // TD
+            SW = -1;
+            break;
+        case 0xD8: // RD
+            A = 0;
+            break;
+        case 0xDC: // WD
+            break;
 
             /* Format 2 */
         case 0x90: // ADDR
@@ -539,6 +550,10 @@ int llRun(void){
             r1 = instruction & 0xF0;
             r1 >>= 4;
             r2 = instruction & 0xF;
+
+            /* get values from r1 and r2 */
+            r1 = llGetRegVal(r1);
+            r2 = llGetRegVal(r2);
 
             if(r1 < r2) SW = -1;
             else if(r1 > r2) SW = 1;
@@ -561,6 +576,9 @@ int llRun(void){
             r1 = instruction & 0xF0;
             r1 >>= 4;
 
+            /* get reg value from r1 */
+            r1 = llGetRegVal(r1);
+
             if(X < r1) SW = -1;
             else if(X > r1) SW = 1;
             else  SW = 0;
@@ -582,39 +600,50 @@ int llRun(void){
             PC = targetADDR;
             break;
         case 0x30: // JEQ
+            /* if(SW == 0) PC = llInterpretTA(targetADDR, ni, format); */
             if(SW == 0) PC = targetADDR;
             break;
         case 0x34: // JGT
+            /* if(SW > 0) PC = llInterpretTA(targetADDR, ni, format); */
             if(SW > 0) PC = targetADDR;
             break;
         case 0x38: // JLT
+            /* if(SW < 0) PC = llInterpretTA(targetADDR, ni, format); */
             if(SW < 0) PC = targetADDR;
             break;
         case 0x48: // JSUB
             L = PC;
+            /* PC = llInterpretTA(targetADDR, ni, format); */
             PC = targetADDR;
             break;
         case 0x00: // LDA
-            A = llInterpretTA(targetADDR, ni, format);
+            /* A = llInterpretTA(targetADDR, ni, format); */
+            A = llTargetAddress(instruction, format);
             break;
         case 0x68: // LDB
-            B = llInterpretTA(targetADDR, ni, format);
+            /* B = llInterpretTA(targetADDR, ni, format); */
+            B = llTargetAddress(instruction, format);
             break;
         case 0x50: // LDCH
             A = A & 0xFFFF00; // clear last byte
-            A += llInterpretTA(targetADDR, ni, format) & 0x0FF; // only load last byte
+            /* A += llInterpretTA(targetADDR, ni, format) & 0x0FF; // only load last byte */
+            A += llTargetAddress(instruction, format) & 0x0FF; // only load last byte
             break;
         case 0x08: // LDL
-            L = llInterpretTA(targetADDR, ni, format);
+            /* L = llInterpretTA(targetADDR, ni, format); */
+            L = llTargetAddress(instruction, format);
             break;
         case 0x6C: // LDS
-            S = llInterpretTA(targetADDR, ni, format);
+            /* S = llInterpretTA(targetADDR, ni, format); */
+            S = llTargetAddress(instruction, format);
             break;
         case 0x74: // LDT
-            T = llInterpretTA(targetADDR, ni, format);
+            /* T = llInterpretTA(targetADDR, ni, format); */
+            T = llTargetAddress(instruction, format);
             break;
         case 0x04: // LDX
-            X = llInterpretTA(targetADDR, ni, format);
+            /* X = llInterpretTA(targetADDR, ni, format); */
+            X = llTargetAddress(instruction, format);
             break;
         case 0xD0: // LPS
             break;
@@ -674,13 +703,15 @@ int llTargetAddress(int instruction, int format){
         x = instruction & 0x8000;
         b = instruction & 0x4000;
         p = instruction & 0x2000;
-        targetADDR = instruction & 0xFFF;
+        targetADDR = instruction & 0xFFF; // lower 12 bits
+        if(targetADDR & 0x800) targetADDR += 0xFFFFF000; // sign extension
         break;
     case 4:
         x = instruction & 0x800000;
         b = instruction & 0x400000;
         p = instruction & 0x200000;
-        targetADDR = instruction & 0xFFFFF;
+        targetADDR = instruction & 0xFFFFF; // lower 20 bits
+        /* if(targetADDR & 0x80000) targetADDR += 0xFFF00000; // sign extension */
         break;
     }
     if(x){
@@ -746,7 +777,34 @@ void llSetRegVal(int reg, int value){
     }
 }
 
+int llGetRegVal(int reg){
+    int value = 0;
+
+    switch(reg){
+    case 0: // A
+        return A;
+    case 1: // X
+        return X;
+    case 2: // L
+        return L;
+    case 3: // B
+        return B;
+    case 4: // S
+        return S;
+    case 5: // T
+        return T;
+    case 8: // PC
+        return PC;
+    case 9: // SW
+        return SW;
+    }
+
+    return value;
+}
+
 int llInterpretTA(int targetADDR, unsigned char ni, int format){
+    /* This function is supposed to interpret the target address */
+    /* but for some reason I didn't get it to work and solved it in another way. */
     int value = 0;
     switch(ni){
     case 0x01: // immediate mode
@@ -754,10 +812,11 @@ int llInterpretTA(int targetADDR, unsigned char ni, int format){
         break;
     case 0x02: // indirect mode
         value = llFetchFromMemory(targetADDR, format * 2);
-        value = llFetchFromMemory(value, format * 2);
+        value = llTargetAddress(value, format);
         break;
     case 0x03: // simple mode
-        value = llFetchFromMemory(targetADDR, format * 2);
+        /* value = llFetchFromMemory(targetADDR, format * 2); */
+        value = llFetchFromMemory(targetADDR, 6);
         break;
     }
     return value;
@@ -798,7 +857,7 @@ int llBreakPoint(char** args, int n){
     }
 
     if(!status){ // if argument is "clear"
-        llClearBP();
+        llClearBP(1);
     }
     else{ // if argument is an address
         status = llAddBP(hexToInt(args[1]), args[1]);
@@ -842,13 +901,14 @@ int llAddBP(int breakpoint, char* input){
     return 1;
 }
 
-void llClearBP(void){
+void llClearBP(int mode){
+    /* mode 0 = silent mode */
     if(bpCount){
         free(BP);
         bpCurrentMax = 0; bpCount = 0;
-        printf("\t[ok] clear all breakpoints\n");
+        if(mode) printf("\t[ok] clear all breakpoints\n");
     }
     else{
-        printf("No Breakpoints inserted. Nothing to clear.\n");
+        if(mode) printf("No Breakpoints inserted. Nothing to clear.\n");
     }
 }

@@ -29,6 +29,7 @@ int main(void){
     freeHashtable();
     initializeASM(0);
     resetESTAB();
+    llClearBP(0);
 
     return 1;
 }
