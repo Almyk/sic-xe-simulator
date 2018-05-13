@@ -479,6 +479,7 @@ int llRun(void){
 
         if(PC > 0xFFFFF) break; // out of memory range
         if(PROGLEN > 0 && PC > PROGADDR + PROGLEN) break; // reached end of program
+        if(PC < PROGADDR) break; // out of bounds
 
         /* get object code and ni bits*/
         opcode = MEMORY[PC] & 0xFC; // ignores the 2 LSB
